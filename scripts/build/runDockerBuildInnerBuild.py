@@ -48,6 +48,7 @@ class LinuxEnvironment:
 
     def run_conan_install(self):
         # assuming working directory == build directory
+        self.dispatch_subprocess(['conan', 'search', '*'])
         self.dispatch_subprocess(['conan', 'install', '/catapult-src', '--build', 'missing'])
 
 
