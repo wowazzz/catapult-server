@@ -44,6 +44,8 @@ class LinuxEnvironment:
         for key, value in settings.items():
             self.dispatch_subprocess(['conan', 'profile', 'update', 'settings.compiler.{}={}'.format(key, value), 'default'])
 
+        self.dispatch_subprocess(['conan', 'remove', '--locks'])
+
     def run_conan_install(self):
         # assuming working directory == build directory
         self.dispatch_subprocess(['conan', 'install', '/catapult-src', '--build', 'missing'])

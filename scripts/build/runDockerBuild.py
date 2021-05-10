@@ -146,6 +146,9 @@ def main():
 
     process_manager = ProcessManager(args.dry_run)
 
+    process_manager.dispatch_subprocess(['ls', '-alh', options.conan_path])
+    process_manager.dispatch_subprocess(['ls', '-alh', options.conan_path / '.conan' ])
+
     return_code = process_manager.dispatch_subprocess(docker_run)
     if return_code:
         sys.exit(return_code)
