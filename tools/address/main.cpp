@@ -20,8 +20,8 @@
 **/
 
 #include "tools/ToolMain.h"
-#include "tools/AccountTool.h"
 #include "catapult/model/Address.h"
+#include "tools/AccountTool.h"
 #include "catapult/utils/ConfigurationValueParsers.h"
 
 namespace catapult { namespace tools { namespace address {
@@ -40,9 +40,10 @@ namespace catapult { namespace tools { namespace address {
 			}};
 
 			Mode mode;
-			if (!utils::TryParseEnumValue(String_To_Mode_Pairs, str, mode)) {
+			if (!utils::TryParseEnumValue(String_To_Mode_Pairs, str, mode)){
 				std::ostringstream out;
-				out << "'" << str << "' is not a valid mode";
+				out << "'"
+					<< str << "' is not a valid mode";
 				CATAPULT_THROW_INVALID_ARGUMENT(out.str().c_str());
 			}
 
@@ -60,6 +61,7 @@ namespace catapult { namespace tools { namespace address {
 
 		private:
 			void prepareAdditionalOptions(OptionsBuilder& optionsBuilder) override {
+				std::string fileName = "";
 				optionsBuilder("mode,m",
 						OptionsValue<std::string>()->required(),
 						"mode, possible values: encoded, decoded, public, secret");
