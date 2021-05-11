@@ -171,12 +171,11 @@ pipeline {
                     }
                 }
             }
-        }
-    }
-
-    post {
-        always {
-            junit 'catapult-data/logs/*.xml'
+            post {
+                always {
+                    junit 'catapult-data/logs/*.xml'
+                }
+            }
         }
     }
 }
