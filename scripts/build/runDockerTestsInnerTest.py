@@ -23,7 +23,7 @@ class SanitizerEnvironment:
         with open(TSAN_SUPPRESSIONS_PATH, 'wt') as outfile:
             outfile.write('race:~weak_ptr\n')
             outfile.write('race:~executor\n')
-            outfile.write('ace:global_logger::get()')
+            outfile.write('race:global_logger::get()')
 
         options = {
             'external_symbolizer_path': str(USER_HOME / 'deps' / 'llvm-symbolizer'),
@@ -68,6 +68,10 @@ def main():
 
     failed_test_suites = []
     for filepath in environment_manager.find_glob(args.exe_path, 'tests*'):
+        if '.int.' in filepath:
+            print('skipping int tests')
+            continue
+
         output_filepath = Path(args.out_dir) / (filepath.name + '.xml')
         test_args = [
             filepath,
