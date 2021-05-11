@@ -6,6 +6,35 @@ from configuration import load_compiler_configuration
 from environment import EnvironmentManager
 from process import ProcessManager
 
+USER_HOME = Path('/usr/catapult')
+TSAN_SUPPRESSIONS_PATH = '/tmp/tsan-suppressions.txt'
+
+
+class SanitizerEnvironment:
+    def __init__(self, environment_manager, sanitizers):
+        self.environment_manager = environment_manager
+        self.sanitizers = sanitizers
+
+    def prepare(self):
+        if 'thread' in self.sanitizers:
+            self.prepare_thread_sanitizer()
+
+    def prepare_thread_sanitizer(self):
+        with open(TSAN_SUPPRESSIONS_PATH, 'wt') as outfile:
+            outfile.write('race:~weak_ptr\n')
+            outfile.write('race:~executor\n')
+            outfile.write('ace:global_logger::get()')
+
+        options = {
+            'external_symbolizer_path': str(USER_HOME / 'deps' / 'llvm-symbolizer'),
+            'suppressions': TSAN_SUPPRESSIONS_PATH,
+            'logpath': 'tsanlog'
+        }
+
+        options_string = ':'.join(map('{}={}'.format, options.items()))
+        self.environment_manager.set_env_var('TSAN_OPTIONS', options_string)
+        print('tsan options: {}'.format(options_string))
+
 
 def prepare_tests(environment_manager):
     environment_manager.copy_tree_with_symlinks('/catapult-src/seed', '/catapult-data/seed')
@@ -24,11 +53,12 @@ def main():
     parser.add_argument('--dry-run', help='outputs desired commands without runing them', action='store_true')
     args = parser.parse_args()
 
-    compiler_configuration = load_compiler_configuration(args.compiler_configuration)
-    print(compiler_configuration.sanitizers)
-
     process_manager = ProcessManager(args.dry_run)
     environment_manager = EnvironmentManager(args.dry_run)
+
+    compiler_configuration = load_compiler_configuration(args.compiler_configuration)
+    sanitizer_environment = SanitizerEnvironment(environment_manager, compiler_configuration.sanitizers)
+    sanitizer_environment.prepare()
 
     prepare_tests(environment_manager)
 
