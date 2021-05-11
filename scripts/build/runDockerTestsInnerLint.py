@@ -2,12 +2,12 @@ import argparse
 import re
 from pathlib import Path
 
-from process import ProcessManager
 from environment import EnvironmentManager
-
+from process import ProcessManager
 
 OUTPUT_DIR = Path('catapult-data')
 SRC_DIR = Path('catapult-src')
+
 
 def print_linter_status(name, return_code):
     print('{} {}'.format(name, 'succeeded' if not return_code else 'FAILED'))
@@ -101,9 +101,10 @@ def run_python_linters(linter_runner, python_files):
     linter_runner.fixup_source_path()
     linter_runner.cat()
 
+
 def main():
-    parser = argparse.ArgumentParser(description='catapult bench runner')
-    parser.add_argument('--out-dir', help='directory in which to store result files', required=True)
+    parser = argparse.ArgumentParser(description='catapult lint runner')
+    parser.add_argument('--out-dir', help='directory in which to store lint output files', required=True)
     parser.add_argument('--dry-run', help='outputs desired commands without runing them', action='store_true')
     args = parser.parse_args()
 
@@ -118,8 +119,6 @@ def main():
     linter_runner = LinterRunner(process_manager, args.out_dir, args.dry_run)
     run_shell_linters(linter_runner, find_files_with_extension(environment_manager, '.sh'))
     run_python_linters(linter_runner, find_files_with_extension(environment_manager, '.py'))
-
-    process_manager.dispatch_subprocess(['ls', '-lAF', args.out_dir]) # TODO rem
 
 
 if __name__ == '__main__':
