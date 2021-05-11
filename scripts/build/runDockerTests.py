@@ -22,9 +22,10 @@ def create_docker_compose_command(mode):
     ]
 
 
-def prepare_docker_compose_file(input_filepath, image_name, user, verbosity, outfile):
+def prepare_docker_compose_file(input_filepath, image_name, compiler_configuration_filepath, user, verbosity, outfile):
     replacements = [
         ('{{IMAGE_NAME}}', image_name),
+        ('{{COMPILER_CONFIGURATION}}', compiler_configuration_filepath),
         ('{{USER}}', '"{}"'.format(user)),
 
         ('{{BUILD_NUMBER}}', get_image_label(image_name)),
@@ -45,6 +46,7 @@ def prepare_docker_compose_file(input_filepath, image_name, user, verbosity, out
 def main():
     parser = argparse.ArgumentParser(description='catapult tests runner')
     parser.add_argument('--image', help='docker tests image', required=True)
+    parser.add_argument('--compiler-configuration', help='path to compiler configuration yaml', required=True)
     parser.add_argument('--user', help='docker user', required=True)
     parser.add_argument('--mode', help='test mode', choices=('bench', 'test'), required=True)
     parser.add_argument('--verbosity', help='verbosity level', default='max')
@@ -56,7 +58,7 @@ def main():
     compose_template_directory = Path(__file__).parent / 'templates'
     compose_template_filepath = compose_template_directory / 'Run{}.yaml'.format(args.mode.capitalize())
     print('processing template from {}'.format(compose_template_filepath))
-    prepare_args = [compose_template_filepath, args.image, args.user, args.verbosity]
+    prepare_args = [compose_template_filepath, args.image, args.compiler_configuration, args.user, args.verbosity]
     prepare_docker_compose_file(*(prepare_args + [sys.stdout]))  # pylint: disable=too-many-function-args
 
     if not args.dry_run:

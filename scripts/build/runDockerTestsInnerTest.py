@@ -2,6 +2,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from configuration import load_compiler_configuration
 from environment import EnvironmentManager
 from process import ProcessManager
 
@@ -16,11 +17,15 @@ def prepare_tests(environment_manager):
 
 def main():
     parser = argparse.ArgumentParser(description='catapult test runner')
+    parser.add_argument('--compiler-configuration', help='path to compiler configuration yaml', required=True)
     parser.add_argument('--exe-path', help='path to executables', required=True)
     parser.add_argument('--out-dir', help='directory in which to store result files', required=True)
     parser.add_argument('--verbosity', help='output verbosity', choices=('suite', 'test', 'max'), default='max')
     parser.add_argument('--dry-run', help='outputs desired commands without runing them', action='store_true')
     args = parser.parse_args()
+
+    compiler_configuration = load_compiler_configuration(args.compiler_configuration)
+    print(compiler_configuration.sanitizers)
 
     process_manager = ProcessManager(args.dry_run)
     environment_manager = EnvironmentManager(args.dry_run)
