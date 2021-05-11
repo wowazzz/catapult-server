@@ -68,7 +68,7 @@ def main():
 
     failed_test_suites = []
     for filepath in environment_manager.find_glob(args.exe_path, 'tests*'):
-        if '.int.' in filepath:
+        if '.int.' in str(filepath):
             print('skipping int tests')
             continue
 
