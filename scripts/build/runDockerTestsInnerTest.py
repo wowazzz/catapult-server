@@ -31,7 +31,7 @@ class SanitizerEnvironment:
             'logpath': 'tsanlog'
         }
 
-        options_string = ':'.join(map('{}={}'.format, options.items()))
+        options_string = ':'.join(map('{0[0]}={0[1]}'.format, options.items()))
         self.environment_manager.set_env_var('TSAN_OPTIONS', options_string)
         print('tsan options: {}'.format(options_string))
 
