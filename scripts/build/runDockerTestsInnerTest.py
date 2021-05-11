@@ -42,6 +42,8 @@ def main():
         if process_manager.dispatch_test_subprocess(test_args, args.verbosity):
             failed_test_suites.append(filepath)
 
+        process_manager.dispatch_subprocess(['ls', '-laF', '.'])
+
     if failed_test_suites:
         print('test failures detected')
         for test_suite in sorted(failed_test_suites):
