@@ -24,6 +24,9 @@
 #include "catapult/cache_core/AccountStateCacheUtils.h"
 #include "catapult/model/InflationCalculator.h"
 #include "catapult/model/Mosaic.h"
+#include "catapult/utils/Logging.h"
+#include "plugins/txes/price/src/observers/priceUtil.cpp"
+// Not ideal but the implementation file can't be found otherwise before the header is included
 
 namespace catapult { namespace observers {
 
@@ -77,8 +80,85 @@ namespace catapult { namespace observers {
 
 	DECLARE_OBSERVER(HarvestFee, Notification)(const HarvestFeeOptions& options, const model::InflationCalculator& calculator) {
 		return MAKE_OBSERVER(HarvestFee, Notification, ([options, calculator](const Notification& notification, ObserverContext& context) {
-			auto inflationAmount = calculator.getSpotAmount(context.Height);
-			auto totalAmount = notification.TotalFee + inflationAmount;
+
+			Amount inflationAmount = Amount(0);
+			Amount totalAmount = Amount(0);
+			double multiplier = 1;
+			uint64_t feeToPay = 0;
+			uint64_t totalSupply = 0;
+			uint64_t collectedEpochFees = 0;
+			uint64_t inflation = 0;
+
+			if (NotifyMode::Commit == context.Mode) {
+				multiplier = catapult::plugins::getCoinGenerationMultiplier(context.Height.unwrap());
+				feeToPay = catapult::plugins::getFeeToPay(context.Height.unwrap());
+				if (catapult::plugins::epochFees.size() > 0) {
+					collectedEpochFees = std::get<1>(catapult::plugins::epochFees.back());
+				} else {
+					CATAPULT_LOG(warning) << "Warning: epoch fees list is empty\n";
+				}
+				collectedEpochFees += notification.TotalFee.unwrap();
+				catapult::plugins::addEpochFeeEntry(context.Height.unwrap(), collectedEpochFees, feeToPay);
+				if (catapult::plugins::totalSupply.size() > 0) {
+					totalSupply = std::get<1>(catapult::plugins::totalSupply.back());
+				} else {
+					CATAPULT_LOG(warning) << "Warning: total supply list is empty\n";
+				}
+				inflation = static_cast<uint64_t>((double)totalSupply * multiplier / 52560000 + 0.5);
+				if (totalSupply + inflation > 100000000000) {
+					inflation = 100000000000 - totalSupply;
+				}
+				totalSupply += inflation;
+				catapult::plugins::addTotalSupplyEntry(context.Height.unwrap(), totalSupply, inflation);
+				
+				inflationAmount = Amount(inflation);
+				totalAmount = Amount(inflation + feeToPay);
+
+			} else if (NotifyMode::Rollback == context.Mode) {
+				multiplier = catapult::plugins::getCoinGenerationMultiplier(context.Height.unwrap(), true);
+				feeToPay = catapult::plugins::getFeeToPay(context.Height.unwrap(), true);
+				std::deque<std::tuple<uint64_t, uint64_t, uint64_t>>::reverse_iterator it;
+				if (catapult::plugins::epochFees.size() > 0) {
+					for (it = catapult::plugins::epochFees.rbegin(); it != catapult::plugins::epochFees.rend(); ++it) {         
+						if (std::get<0>(*it) == context.Height.unwrap() && std::get<2>(*it) == feeToPay) {
+							collectedEpochFees = std::get<1>(*it);
+							break;
+						}
+						if (context.Height.unwrap() > std::get<0>(*it)) {
+							CATAPULT_LOG(error) << "Error: epoch fee entry for block " << context.Height.unwrap() <<
+								" can't be found\n";
+							break;
+						}
+					}
+				} else {
+					CATAPULT_LOG(error) << "Error: epoch fees list is empty, rollback mode\n";
+				}
+				catapult::plugins::removeEpochFeeEntry(context.Height.unwrap(), collectedEpochFees, feeToPay);
+				if (catapult::plugins::totalSupply.size() > 0) {
+					for (it = catapult::plugins::totalSupply.rbegin(); it != catapult::plugins::totalSupply.rend(); ++it) {         
+						if (std::get<0>(*it) == context.Height.unwrap()) {
+							totalSupply = std::get<1>(*it);
+							break;
+						}
+						if (context.Height.unwrap() > std::get<0>(*it)) {
+							CATAPULT_LOG(error) << "Error: total supply entry for block " << context.Height.unwrap() <<
+								" can't be found\n";
+							CATAPULT_LOG(error) << catapult::plugins::totalSupplyToString();
+							break;
+						}
+					}
+				} else {
+					CATAPULT_LOG(error) << "Error: total supply list is empty, rollback mode\n";
+				}
+				inflation = static_cast<uint64_t>((double)totalSupply * multiplier / 52560000 + 0.5);
+				if (totalSupply + inflation > 100000000000) {
+					inflation = 100000000000 - totalSupply;
+				}
+				catapult::plugins::removeTotalSupplyEntry(context.Height.unwrap(), totalSupply, inflation);
+
+				inflationAmount = Amount(inflation);
+				totalAmount = Amount(inflation + feeToPay);
+			}
 
 			auto networkAmount = Amount(totalAmount.unwrap() * options.HarvestNetworkPercentage / 100);
 			auto beneficiaryAmount = ShouldShareFees(notification, options.HarvestBeneficiaryPercentage)
