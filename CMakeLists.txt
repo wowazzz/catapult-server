@@ -30,7 +30,7 @@ endfunction()
 
 ### setup boost
 message("--- locating boost dependencies ---")
-find_package(Boost 1.75.0 EXACT COMPONENTS ${CATAPULT_BOOST_COMPONENTS} REQUIRED)
+find_package(Boost 1.76.0 EXACT COMPONENTS ${CATAPULT_BOOST_COMPONENTS} REQUIRED)
 include_directories(SYSTEM ${Boost_INCLUDE_DIR})
 
 message("boost     ver: ${Boost_VERSION}")
@@ -54,7 +54,7 @@ endfunction()
 
 ### setup rocksdb
 message("--- locating rocksdb dependencies ---")
-find_package(RocksDB 6.13.3 EXACT REQUIRED)
+find_package(RocksDB 6.20.3 EXACT REQUIRED)
 
 if(WIN32)
 	set(RocksDB_LIBRARY RocksDB::rocksdb)
