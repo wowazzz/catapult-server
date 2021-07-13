@@ -324,7 +324,6 @@ namespace catapult { namespace plugins {
             file = std::fopen("prices.txt", "w+");
             if (!file) {
                 CATAPULT_LOG(error) << "Error: Can't open nor create the prices.txt file\n";
-                fclose(file);
                 return;
             }
         } else {
@@ -409,7 +408,6 @@ namespace catapult { namespace plugins {
         FILE *file = std::fopen("prices.txt", "r+");
         if (!file) {
             CATAPULT_LOG(warning) << "Warning: prices.txt does not exist\n";
-            fclose(file);
             return;
         }
         fseek(file, 0, SEEK_END);
@@ -548,7 +546,6 @@ namespace catapult { namespace plugins {
             file = std::fopen("totalSupply.txt", "w+");
             if (!file) {
                 CATAPULT_LOG(error) << "Error: Can't open nor create the totalSupply.txt file\n";
-                fclose(file);
                 return;
             }
         } else {
@@ -627,7 +624,6 @@ namespace catapult { namespace plugins {
         FILE *file = std::fopen("totalSupply.txt", "r+");
         if (!file) {
             CATAPULT_LOG(warning) << "Warning: totalSupply.txt does not exist\n";
-            fclose(file);
             return;
         }
         fseek(file, 0, SEEK_END);
@@ -732,7 +728,6 @@ namespace catapult { namespace plugins {
             file = std::fopen("epochFees.txt", "w+");
             if (!file) {
                 CATAPULT_LOG(error) << "Error: Can't open nor create the epochFees.txt file\n";
-                fclose(file);
                 return;
             }
         } else {
@@ -811,7 +806,6 @@ namespace catapult { namespace plugins {
         FILE *file = std::fopen("epochFees.txt", "r+");
         if (!file) {
             CATAPULT_LOG(warning) << "Warning: epochFees.txt does not exist\n";
-            fclose(file);
             return;
         }
         fseek(file, 0, SEEK_END);
