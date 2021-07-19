@@ -80,6 +80,14 @@ namespace catapult { namespace observers {
 
 	DECLARE_OBSERVER(HarvestFee, Notification)(const HarvestFeeOptions& options, const model::InflationCalculator& calculator) {
 		return MAKE_OBSERVER(HarvestFee, Notification, ([options, calculator](const Notification& notification, ObserverContext& context) {
+			
+			if (catapult::plugins::totalSupply.size() == 0) {
+				// if there are no records, load them from the files
+				catapult::plugins::loadEpochFeeFromFile();
+				catapult::plugins::loadPricesFromFile();
+				catapult::plugins::loadTotalSupplyFromFile();
+				catapult::plugins::totalSupply.push_front({0, 10000000000, 10000000000}); // initial supply
+			}
 
 			Amount inflationAmount = Amount(0);
 			Amount totalAmount = Amount(0);

@@ -19,6 +19,10 @@
 #define SUPPLY_DATA_SIZE 3
 #define EPOCH_FEES_DATA_SIZE 3
 
+// TODO: move to config files
+#define FEE_RECALCULATION_FREQUENCY 10
+#define MULTIPLIER_RECALCULATION_FREQUENCY 5
+
 namespace catapult { namespace plugins {
 
     std::deque<std::tuple<uint64_t, uint64_t, uint64_t, double>> priceList;
@@ -49,7 +53,7 @@ namespace catapult { namespace plugins {
     }
 
     double getCoinGenerationMultiplier(uint64_t blockHeight, bool rollback) {
-        if (blockHeight % 720 > 0 && currentMultiplier != 0 && !rollback) // recalculate only every 720 blocks
+        if (blockHeight % MULTIPLIER_RECALCULATION_FREQUENCY > 0 && currentMultiplier != 0 && !rollback) // recalculate only every 720 blocks
             return currentMultiplier;
         else if (currentMultiplier == 0)
             currentMultiplier = 1;
@@ -134,7 +138,7 @@ namespace catapult { namespace plugins {
             feeToPay = std::get<2>(epochFees.back());
             return feeToPay;
         }
-        if (blockHeight % 720 == 0) {
+        if (blockHeight % FEE_RECALCULATION_FREQUENCY == 0) {
             if (epochFees.size() == 0) {
                 feeToPay = 0;
                 return feeToPay;
@@ -142,7 +146,7 @@ namespace catapult { namespace plugins {
             if (blockHeight - 1 != std::get<0>(epochFees.back())) {
                 CATAPULT_LOG(error) << "Error: missing epochFees records\n";
             }
-            feeToPay = static_cast<unsigned int>((double)std::get<1>(epochFees.back()) / 720 + 0.5);
+            feeToPay = static_cast<unsigned int>((double)std::get<1>(epochFees.back()) / FEE_RECALCULATION_FREQUENCY + 0.5);
         }
         return feeToPay;
     }
@@ -157,7 +161,7 @@ namespace catapult { namespace plugins {
         if (priceList.size() == 0)
             return;
         int count = 0;
-        uint64_t boundary = 86400; // number of blocks equivalent to 30 days
+        uint64_t boundary = 300; // number of blocks equivalent to 30 days
         double *averagePtr = &average30;
         std::deque<std::tuple<uint64_t, uint64_t, uint64_t, double>>::reverse_iterator it;
         // we also need to visit priceList.begin(), so we just break when we reach it
@@ -179,7 +183,7 @@ namespace catapult { namespace plugins {
                     break; // 120 days reached
                 }
                 count = 0;
-                boundary += 86400;
+                boundary += 300;
                 if (blockHeight + 1u < boundary) // not enough blocks for the next 30 days
                     break;
             } else if (std::get<0>(*it) > blockHeight) {
@@ -196,7 +200,7 @@ namespace catapult { namespace plugins {
         else
             *averagePtr = 0;
 
-        CATAPULT_LOG(debug) << "New averages found for block height " << blockHeight
+        CATAPULT_LOG(info) << "New averages found for block height " << blockHeight
             <<": 30 day average : " << average30 << ", 60 day average: " << average60
             << ", 90 day average: " << average90 << ", 120 day average: " << average120 << "\n";
     }
@@ -228,8 +232,7 @@ namespace catapult { namespace plugins {
 			}
 			return;
 		}
-		catapult::plugins::addPrice(blockHeight, lowPrice, highPrice,
-			multiplier);
+		catapult::plugins::addPrice(blockHeight, lowPrice, highPrice, multiplier);
     }
     
     //endregion block_reward
@@ -278,14 +281,15 @@ namespace catapult { namespace plugins {
         if (priceList.size() > 0) {
             previousTransactionHeight = std::get<0>(priceList.back());
             if (previousTransactionHeight >= blockHeight) {
-                CATAPULT_LOG(error) << "Error: price transaction block height is lower or equal to the previous\n";
+                CATAPULT_LOG(warning) << "Warning: price transaction block height is lower or equal to the previous: " <<
+                    "Previous height: " << previousTransactionHeight << ", current height: " << blockHeight << "\n";
                 return false;
             }
 
             if (previousTransactionHeight == blockHeight && std::get<1>(priceList.back()) == lowPrice &&
                 std::get<2>(priceList.back()) == highPrice && std::get<3>(priceList.back()) == multiplier) {
                 // data matches, so must be a duplicate, however, no need to resynchronise prices
-                CATAPULT_LOG(error) << "Error: price transaction data is equal to the previous price transaction data: "
+                CATAPULT_LOG(warning) << "Warning: price transaction data is equal to the previous price transaction data: "
                     << "block height: " << blockHeight << ", lowPrice: " << lowPrice << ", highPrice: " << highPrice << "\n";
                 return true;
             }
@@ -294,7 +298,7 @@ namespace catapult { namespace plugins {
         if (addToFile)
             addPriceEntryToFile(blockHeight, lowPrice, highPrice, multiplier);
 
-        CATAPULT_LOG(debug) << "New price added to the list for block " << blockHeight << " , lowPrice: "
+        CATAPULT_LOG(info) << "New price added to the list for block " << blockHeight << " , lowPrice: "
             << lowPrice << ", highPrice: " << highPrice << ", multiplier: " << multiplier << "\n";
         return true;
     }
@@ -308,7 +312,7 @@ namespace catapult { namespace plugins {
             if (std::get<0>(*it) == blockHeight && std::get<1>(*it) == lowPrice &&
                 std::get<2>(*it) == highPrice && std::get<3>(*it) == multiplier) {
                 it = decltype(it)(priceList.erase(std::next(it).base()));
-                CATAPULT_LOG(debug) << "Price removed from the list for block " << blockHeight 
+                CATAPULT_LOG(info) << "Price removed from the list for block " << blockHeight 
                     << ", lowPrice: " << lowPrice << ", highPrice: " << highPrice << ", multiplier: "
                     << multiplier << "\n";
                 break;
@@ -492,12 +496,13 @@ namespace catapult { namespace plugins {
             previousEntryHeight = std::get<0>(totalSupply.back());
             previousEntrySupply = std::get<1>(totalSupply.back());
             if (previousEntryHeight >= blockHeight) {
-                CATAPULT_LOG(error) << "Error: total supply block height is lower or equal to the previous\n";
+                CATAPULT_LOG(warning) << "Warning: total supply block height is lower or equal to the previous: " <<
+                    "Previous height: " << previousEntryHeight << ", current height: " << blockHeight << "\n";
                 return false;
             }
 
             if (previousEntrySupply > supplyAmount) {
-                CATAPULT_LOG(error) << "Error: total supply is lower than the previous supply\n";
+                CATAPULT_LOG(warning) << "Warning: total supply is lower than the previous supply\n";
                 return false;
             }
 
@@ -508,7 +513,7 @@ namespace catapult { namespace plugins {
 
             if (previousEntryHeight == blockHeight) {
                 // data matches, so must be a duplicate, however, no need to resynchronise prices, just ignore it
-                CATAPULT_LOG(error) << "Error: total supply block is equal to the previous entry block height: "
+                CATAPULT_LOG(warning) << "Warning: total supply block is equal to the previous entry block height: "
                     << "block height: " << blockHeight << "\n";
                 return false;
             }
@@ -517,7 +522,7 @@ namespace catapult { namespace plugins {
         if (addToFile)
             addTotalSupplyEntryToFile(blockHeight, supplyAmount, increase);
 
-        CATAPULT_LOG(debug) << "New total supply entry added to the list for block " << blockHeight
+        CATAPULT_LOG(info) << "New total supply entry added to the list for block " << blockHeight
             << " , suply: " << supplyAmount << ", increase: " << increase << "\n";
         return true;
     }
@@ -531,7 +536,7 @@ namespace catapult { namespace plugins {
             if (std::get<0>(*it) == blockHeight && std::get<1>(*it) == supplyAmount &&
                 std::get<2>(*it) == increase) {
                 it = decltype(it)(totalSupply.erase(std::next(it).base()));
-                CATAPULT_LOG(debug) << "Total supply entry removed from the list for block " << blockHeight 
+                CATAPULT_LOG(info) << "Total supply entry removed from the list for block " << blockHeight 
                     << ", supplyAmount: " << supplyAmount << ", increase: " << increase << "\n";
                 break;
             }
@@ -691,7 +696,8 @@ namespace catapult { namespace plugins {
         if (epochFees.size() > 0) {
             previousEntryHeight = std::get<0>(epochFees.back());
             if (previousEntryHeight >= blockHeight) {
-                CATAPULT_LOG(error) << "Error: epoch fee entry block height is lower or equal to the previous\n";
+                CATAPULT_LOG(warning) << "Warning: epoch fee entry block height is lower or equal to the previous: " <<
+                    "Previous height: " << previousEntryHeight << ", current height: " << blockHeight << "\n";
                 return false;
             }
         }
@@ -699,7 +705,7 @@ namespace catapult { namespace plugins {
         if (addToFile)
             addEpochFeeEntryToFile(blockHeight, collectedFees, currentFee);
 
-        CATAPULT_LOG(debug) << "New epoch fee entry added to the list for block " << blockHeight
+        CATAPULT_LOG(info) << "New epoch fee entry added to the list for block " << blockHeight
             << " , collectedFees: " << collectedFees << ", feeToPay: " << currentFee << "\n";
         return true;
     }
@@ -713,7 +719,7 @@ namespace catapult { namespace plugins {
             if (std::get<0>(*it) == blockHeight && std::get<1>(*it) == collectedFees &&
                 std::get<2>(*it) == blockFee) {
                 it = decltype(it)(epochFees.erase(std::next(it).base()));
-                CATAPULT_LOG(debug) << "Epoch fee entry removed from the list for block " << blockHeight 
+                CATAPULT_LOG(info) << "Epoch fee entry removed from the list for block " << blockHeight 
                     << ", collectedFees: " << collectedFees << ", feeToPay: " << blockFee << "\n";
                 break;
             }
@@ -802,7 +808,7 @@ namespace catapult { namespace plugins {
         long size;
         bool errors = false;
         std::string blockHeight = "", collectedFees = "", currentFee = "";
-        totalSupply.clear();
+        epochFees.clear();
         FILE *file = std::fopen("epochFees.txt", "r+");
         if (!file) {
             CATAPULT_LOG(warning) << "Warning: epochFees.txt does not exist\n";
