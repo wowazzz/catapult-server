@@ -41,6 +41,10 @@ static bool areSame(double a, double b) {
     return std::fabs(a - b) < std::numeric_limits<double>::epsilon();
 }
 
+// TODO: move to config files
+#define FEE_RECALCULATION_FREQUENCY 10
+#define MULTIPLIER_RECALCULATION_FREQUENCY 5
+
 namespace catapult { namespace plugins {
 
     /**
