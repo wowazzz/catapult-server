@@ -33,10 +33,6 @@
 namespace catapult { namespace plugins {
 
 	void RegisterPriceSubsystem(PluginManager& manager) {
-		loadEpochFeeFromFile();
-		loadPricesFromFile();
-		loadTotalSupplyFromFile();
-
 		manager.addTransactionSupport(CreatePriceTransactionPlugin());
 
 		manager.addStatelessValidatorHook([](auto& builder) {

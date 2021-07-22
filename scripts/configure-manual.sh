@@ -66,7 +66,7 @@ function download_boost {
 }
 
 function download_git_dependency {
-	git "clone git://github.com/${1}/${2}.git"
+	git clone "git://github.com/${1}/${2}.git"
 	cd "${2}"
 	git checkout "${3}"
 	cd ..
@@ -184,7 +184,7 @@ function install_system_reqs {
 	set -e
 	apt update
 	apt -y upgrade
-	apt -y install "$debs"
+	apt -y install $debs
 	set +e
 }
 
@@ -289,7 +289,7 @@ if [[ -f /proc/cpuinfo ]]; then
 	jobs=$(grep -c "^processor" /proc/cpuinfo)
 fi
 warn_env=0
-debs="git gcc g++ cmake curl libssl-dev ninja-build pkg-config libpython-dev"
+debs="git gcc g++ cmake curl libssl-dev ninja-build pkg-config libpython2-dev"
 cmd=""
 
 while true; do

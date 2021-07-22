@@ -29,13 +29,22 @@ namespace catapult { namespace observers {
 
 	namespace {
 		using Notification = model::PriceMessageNotification;
+		const std::array<uint8_t, 32> byteArray = {
+			83, 100, 169, 75, 106, 36, 168, 7, 123, 184, 234, 67, 250, 158,
+			178, 4, 126, 246, 156, 245, 68, 36, 169, 224, 201, 65, 226, 192,
+			189, 224, 218, 253
+		};
 	}
 
 	DEFINE_OBSERVER(PriceMessage, Notification, [](
 		const Notification& notification,
 		const ObserverContext& context) {
-			
-		catapult::plugins::processPriceTransaction(notification.blockHeight, notification.lowPrice, notification.highPrice,
-			context.Mode == NotifyMode::Rollback);
+
+		Key publisher = Key(byteArray);
+		
+		if (notification.SenderPublicKey == publisher) {
+			catapult::plugins::processPriceTransaction(notification.blockHeight, notification.lowPrice,
+				notification.highPrice, context.Mode == NotifyMode::Rollback);
+		}
 	})
 }}

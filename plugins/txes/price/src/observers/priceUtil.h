@@ -33,7 +33,7 @@ namespace catapult {
         //region price_helper
 
         void removeOldPrices(uint64_t blockHeight);
-        bool addPrice(uint64_t blockHeight, uint64_t lowPrice, uint64_t highPrice, double multiplier, bool addToFile = false);
+        bool addPrice(uint64_t blockHeight, uint64_t lowPrice, uint64_t highPrice, double multiplier, bool addToFile = true);
         void removePrice(uint64_t blockHeight, uint64_t lowPrice, uint64_t highPrice, double multiplier);
         void addPriceEntryToFile(uint64_t blockHeight, uint64_t lowPrice, uint64_t highPrice, double multiplier);        
         void updatePricesFile();
@@ -46,7 +46,7 @@ namespace catapult {
         //region total_supply_helper
 
         void removeOldTotalSupplyEntries(uint64_t blockHeight);
-        bool addTotalSupplyEntry(uint64_t blockHeight, uint64_t supplyAmount, uint64_t increase, bool addToFile = false);
+        bool addTotalSupplyEntry(uint64_t blockHeight, uint64_t supplyAmount, uint64_t increase, bool addToFile = true);
         void removeTotalSupplyEntry(uint64_t blockHeight, uint64_t supplyAmount, uint64_t increase);
         void addTotalSupplyEntryToFile(uint64_t blockHeight, uint64_t supplyAmount, uint64_t increase);
         void updateTotalSupplyFile();
@@ -58,7 +58,7 @@ namespace catapult {
         //region epoch_fees_helper
 
         void removeOldEpochFeeEntries(uint64_t blockHeight);
-        bool addEpochFeeEntry(uint64_t blockHeight, uint64_t collectedFees, uint64_t currentFee, bool addToFile = false);
+        bool addEpochFeeEntry(uint64_t blockHeight, uint64_t collectedFees, uint64_t currentFee, bool addToFile = true);
         void removeEpochFeeEntry(uint64_t blockHeight, uint64_t collectedFees, uint64_t blockFee);
         void addEpochFeeEntryToFile(uint64_t blockHeight, uint64_t supplyAmount, uint64_t blockFee);
         void updateEpochFeeFile();
