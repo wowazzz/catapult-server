@@ -295,6 +295,7 @@ namespace catapult { namespace plugins {
             }
         }
         priceList.push_back({blockHeight, lowPrice, highPrice, multiplier});
+        CATAPULT_LOG(info) << "\n" << pricesToString() << "\n";
         if (addToFile)
             addPriceEntryToFile(blockHeight, lowPrice, highPrice, multiplier);
 
@@ -519,6 +520,7 @@ namespace catapult { namespace plugins {
             }
         }
         totalSupply.push_back({blockHeight, supplyAmount, increase});
+        CATAPULT_LOG(info) << "\n" << totalSupplyToString() << "\n";
         if (addToFile)
             addTotalSupplyEntryToFile(blockHeight, supplyAmount, increase);
 
@@ -702,6 +704,7 @@ namespace catapult { namespace plugins {
             }
         }
         epochFees.push_back({blockHeight, collectedFees, currentFee});
+        CATAPULT_LOG(info) << "\n" << epochFeeToString() << "\n";
         if (addToFile)
             addEpochFeeEntryToFile(blockHeight, collectedFees, currentFee);
 
