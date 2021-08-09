@@ -126,11 +126,6 @@ namespace catapult { namespace plugins {
 
     uint64_t getFeeToPay(uint64_t blockHeight, bool rollback) {
         if (rollback) {
-            // In theory, this loop shouldn't be executed
-            while (epochFees.size() > 0 && std::get<0>(epochFees.back()) > blockHeight) {
-                removeEpochFeeEntry(std::get<0>(epochFees.back()), std::get<1>(epochFees.back()),
-                    std::get<2>(epochFees.back()));
-            }
             if (epochFees.size() == 0) {
                 feeToPay = 0;
                 return feeToPay;
@@ -144,7 +139,8 @@ namespace catapult { namespace plugins {
                 return feeToPay;
             }
             if (blockHeight - 1 != std::get<0>(epochFees.back())) {
-                CATAPULT_LOG(error) << "Error: missing epochFees records\n";
+                CATAPULT_LOG(error) << "Error: missing epochFees records: " << blockHeight - 1 << ", " << 
+                    std::get<0>(epochFees.back()) << "\n";
             }
             feeToPay = static_cast<unsigned int>((double)std::get<1>(epochFees.back()) / FEE_RECALCULATION_FREQUENCY + 0.5);
         }
@@ -295,6 +291,7 @@ namespace catapult { namespace plugins {
             }
         }
         priceList.push_back({blockHeight, lowPrice, highPrice, multiplier});
+        CATAPULT_LOG(info) << "\n" << pricesToString() << "\n";
         if (addToFile)
             addPriceEntryToFile(blockHeight, lowPrice, highPrice, multiplier);
 
@@ -519,6 +516,7 @@ namespace catapult { namespace plugins {
             }
         }
         totalSupply.push_back({blockHeight, supplyAmount, increase});
+        CATAPULT_LOG(info) << "\n" << totalSupplyToString() << "\n";
         if (addToFile)
             addTotalSupplyEntryToFile(blockHeight, supplyAmount, increase);
 
@@ -702,6 +700,7 @@ namespace catapult { namespace plugins {
             }
         }
         epochFees.push_back({blockHeight, collectedFees, currentFee});
+        CATAPULT_LOG(info) << "\n" << epochFeeToString() << "\n";
         if (addToFile)
             addEpochFeeEntryToFile(blockHeight, collectedFees, currentFee);
 
