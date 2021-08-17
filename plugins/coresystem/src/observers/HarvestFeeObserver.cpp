@@ -101,7 +101,12 @@ namespace catapult { namespace observers {
 				multiplier = catapult::plugins::getCoinGenerationMultiplier(context.Height.unwrap());
 				feeToPay = catapult::plugins::getFeeToPay(context.Height.unwrap());
 				if (catapult::plugins::epochFees.size() > 0) {
-					collectedEpochFees = std::get<1>(catapult::plugins::epochFees.back());
+       				std::deque<std::tuple<uint64_t, uint64_t, uint64_t>>::reverse_iterator it;
+					for (it = catapult::plugins::epochFees.rbegin(); it != catapult::plugins::epochFees.rend(); ++it) {
+						if (context.Height.unwrap() > std::get<0>(*it))
+							collectedEpochFees = std::get<1>(*it);
+							break;
+					}
 				} else {
 					CATAPULT_LOG(warning) << "Warning: epoch fees list is empty\n";
 				}
@@ -162,7 +167,7 @@ namespace catapult { namespace observers {
 				if (totalSupply + inflation > 100000000000) {
 					inflation = 100000000000 - totalSupply;
 				}
-				catapult::plugins::removeTotalSupplyEntry(context.Height.unwrap(), totalSupply, inflation);
+				//catapult::plugins::removeTotalSupplyEntry(context.Height.unwrap(), totalSupply, inflation);
 
 				inflationAmount = Amount(inflation);
 				totalAmount = Amount(inflation + feeToPay);

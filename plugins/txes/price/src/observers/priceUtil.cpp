@@ -689,7 +689,7 @@ namespace catapult { namespace plugins {
     bool addEpochFeeEntry(uint64_t blockHeight, uint64_t collectedFees, uint64_t currentFee, bool addToFile) {
         removeOldEpochFeeEntries(blockHeight);
 
-        uint64_t previousEntryHeight;
+        /*uint64_t previousEntryHeight;
 
         if (epochFees.size() > 0) {
             previousEntryHeight = std::get<0>(epochFees.back());
@@ -698,7 +698,7 @@ namespace catapult { namespace plugins {
                     "Previous height: " << previousEntryHeight << ", current height: " << blockHeight << "\n";
                 return false;
             }
-        }
+        }*/
         epochFees.push_back({blockHeight, collectedFees, currentFee});
         CATAPULT_LOG(info) << "\n" << epochFeeToString() << "\n";
         if (addToFile)
