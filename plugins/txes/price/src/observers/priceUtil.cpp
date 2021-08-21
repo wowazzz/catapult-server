@@ -7,6 +7,7 @@
 #include "string.h"
 #include <fstream>
 #include <filesystem>
+#include <vector>
 #include <cmath>
 #include <cstdio>
 #include "src/catapult/io/FileBlockStorage.h"
@@ -17,7 +18,7 @@
 #define BLOCKS_PER_30_DAYS 86400
 #define PRICE_DATA_SIZE 4
 #define SUPPLY_DATA_SIZE 3
-#define EPOCH_FEES_DATA_SIZE 3
+#define EPOCH_FEES_DATA_SIZE 4
 
 // TODO: move to config files
 #define FEE_RECALCULATION_FREQUENCY 10
@@ -27,7 +28,7 @@ namespace catapult { namespace plugins {
 
     std::deque<std::tuple<uint64_t, uint64_t, uint64_t, double>> priceList;
     std::deque<std::tuple<uint64_t, uint64_t, uint64_t>> totalSupply;
-    std::deque<std::tuple<uint64_t, uint64_t, uint64_t>> epochFees;
+    std::deque<std::tuple<uint64_t, uint64_t, uint64_t, std::string>> epochFees;
     double currentMultiplier = 1;
     uint64_t feeToPay = 0;
 
@@ -125,12 +126,21 @@ namespace catapult { namespace plugins {
     }
 
     uint64_t getFeeToPay(uint64_t blockHeight, bool rollback) {
+        uint64_t collectedEpochFees = 0;
+        std::deque<std::tuple<uint64_t, uint64_t, uint64_t, std::string>>::reverse_iterator it;
         if (rollback) {
             if (epochFees.size() == 0) {
                 feeToPay = 0;
                 return feeToPay;
             }
-            feeToPay = std::get<2>(epochFees.back());
+            for (it = catapult::plugins::epochFees.rbegin(); it != catapult::plugins::epochFees.rend(); ++it) {         
+                if (std::get<0>(*it) == blockHeight) {
+                    feeToPay = std::get<2>(*it);
+                } else if (std::get<0>(*it) < blockHeight) {
+                    feeToPay = 0;
+                    break;
+                }
+			}
             return feeToPay;
         }
         if (blockHeight % FEE_RECALCULATION_FREQUENCY == 0) {
@@ -138,11 +148,13 @@ namespace catapult { namespace plugins {
                 feeToPay = 0;
                 return feeToPay;
             }
-            if (blockHeight - 1 != std::get<0>(epochFees.back())) {
-                CATAPULT_LOG(error) << "Error: missing epochFees records: " << blockHeight - 1 << ", " << 
-                    std::get<0>(epochFees.back()) << "\n";
+            for (it = catapult::plugins::epochFees.rbegin(); it != catapult::plugins::epochFees.rend(); ++it) {
+                if (blockHeight - 1 == std::get<0>(*it)) {
+                    collectedEpochFees = std::get<1>(*it);
+                    break;
+                }
             }
-            feeToPay = static_cast<unsigned int>((double)std::get<1>(epochFees.back()) / FEE_RECALCULATION_FREQUENCY + 0.5);
+            feeToPay = static_cast<unsigned int>((double)collectedEpochFees / FEE_RECALCULATION_FREQUENCY + 0.5);
         }
         return feeToPay;
     }
@@ -670,14 +682,14 @@ namespace catapult { namespace plugins {
         if (blockHeight < 100u)
             return;
         bool updated = false;
-        std::deque<std::tuple<uint64_t, uint64_t, uint64_t>>::iterator it;
+        std::deque<std::tuple<uint64_t, uint64_t, uint64_t, std::string>>::iterator it;
         for (it = epochFees.begin(); it != epochFees.end(); ++it) {
             if (std::get<0>(*it) < blockHeight - 99u) { // older than 100 blocks
                 epochFees.erase(it);
                 updated = true;
             }
             else
-                return; // Entries are ordered, so no need to look further
+                break; // Entries are ordered, so no need to look further
             if (it == epochFees.end()) {
                 break;
             }
@@ -686,47 +698,64 @@ namespace catapult { namespace plugins {
             updateEpochFeeFile();
     }
 
-    bool addEpochFeeEntry(uint64_t blockHeight, uint64_t collectedFees, uint64_t currentFee, bool addToFile) {
+    bool addEpochFeeEntry(uint64_t blockHeight, uint64_t collectedFees, uint64_t currentFee, std::string address, bool addToFile) {
         removeOldEpochFeeEntries(blockHeight);
 
-        /*uint64_t previousEntryHeight;
+        uint64_t previousEntryHeight;
+        std::vector<std::string> prevAddresses;
+        std::deque<std::tuple<uint64_t, uint64_t, uint64_t, std::string>>::reverse_iterator it;
 
         if (epochFees.size() > 0) {
             previousEntryHeight = std::get<0>(epochFees.back());
-            if (previousEntryHeight >= blockHeight) {
-                CATAPULT_LOG(warning) << "Warning: epoch fee entry block height is lower or equal to the previous: " <<
+            for (it = catapult::plugins::epochFees.rbegin(); it != catapult::plugins::epochFees.rend(); ++it) {         
+                if (std::get<0>(*it) == previousEntryHeight) {
+                    prevAddresses.push_back(std::get<3>(*it));
+                } else if (std::get<0>(*it) < previousEntryHeight) {
+                    break;
+                }
+			}
+            if (previousEntryHeight > blockHeight) {
+                CATAPULT_LOG(warning) << "Warning: epoch fee entry block height is lower to the previous: " <<
                     "Previous height: " << previousEntryHeight << ", current height: " << blockHeight << "\n";
                 return false;
+            } else if (previousEntryHeight == blockHeight) {
+                for (unsigned int i = 0; i < prevAddresses.size(); ++i) {
+                    if (prevAddresses[i] == address) {
+                        CATAPULT_LOG(warning) << "Warning: skipping a duplicate epoch fee entry for block: " << blockHeight <<
+                            ", collected fees: " << collectedFees << ", currentFee: " << currentFee << "\n";
+                        return false;
+                    }
+                }
             }
-        }*/
-        epochFees.push_back({blockHeight, collectedFees, currentFee});
+        }
+        epochFees.push_back({blockHeight, collectedFees, currentFee, address});
         CATAPULT_LOG(info) << "\n" << epochFeeToString() << "\n";
         if (addToFile)
-            addEpochFeeEntryToFile(blockHeight, collectedFees, currentFee);
+            addEpochFeeEntryToFile(blockHeight, collectedFees, currentFee, address);
 
         CATAPULT_LOG(info) << "New epoch fee entry added to the list for block " << blockHeight
             << " , collectedFees: " << collectedFees << ", feeToPay: " << currentFee << "\n";
         return true;
     }
 
-    void removeEpochFeeEntry(uint64_t blockHeight, uint64_t collectedFees, uint64_t blockFee) {
-        std::deque<std::tuple<uint64_t, uint64_t, uint64_t>>::reverse_iterator it;
+    void removeEpochFeeEntry(uint64_t blockHeight, uint64_t collectedFees, uint64_t blockFee, std::string address) {
+        std::deque<std::tuple<uint64_t, uint64_t, uint64_t, std::string>>::reverse_iterator it;
         for (it = epochFees.rbegin(); it != epochFees.rend(); ++it) {
             if (blockHeight > std::get<0>(*it))
                 break;
 
             if (std::get<0>(*it) == blockHeight && std::get<1>(*it) == collectedFees &&
-                std::get<2>(*it) == blockFee) {
+                std::get<2>(*it) == blockFee && std::get<3>(*it) == address) {
                 it = decltype(it)(epochFees.erase(std::next(it).base()));
                 CATAPULT_LOG(info) << "Epoch fee entry removed from the list for block " << blockHeight 
-                    << ", collectedFees: " << collectedFees << ", feeToPay: " << blockFee << "\n";
+                    << ", collectedFees: " << collectedFees << ", feeToPay: " << blockFee << ", address: " << address << "\n";
                 break;
             }
         }
         updateEpochFeeFile(); // update data in the file
     }
 
-    void addEpochFeeEntryToFile(uint64_t blockHeight, uint64_t collectedFees, uint64_t blockFee) {
+    void addEpochFeeEntryToFile(uint64_t blockHeight, uint64_t collectedFees, uint64_t blockFee, std::string address) {
         long size = 0;
         FILE *file = std::fopen("epochFees.txt", "r+");
         if (!file) {
@@ -744,7 +773,7 @@ namespace catapult { namespace plugins {
                 return;
             }
         }
-        if (size % 34 > 0) {
+        if (size % 84 > 0) {
             CATAPULT_LOG(error) << "Fatal error: epochFees.txt file is corrupt/invalid\n";
             return;
         }
@@ -752,14 +781,19 @@ namespace catapult { namespace plugins {
         std::string epochFeesData[EPOCH_FEES_DATA_SIZE] = {
             std::to_string(blockHeight),
             std::to_string(collectedFees),
-            std::to_string(blockFee)
+            std::to_string(blockFee),
+            address
         };
         
         for (int i = 0; i < EPOCH_FEES_DATA_SIZE; ++i) {
             // add spaces to string as padding
             size = epochFeesData[i].length();
-            if (i > 0) {
+            if (i > 0 && i < EPOCH_FEES_DATA_SIZE - 1) {
                 for (int j = 0; j < 12 - size; ++j) {
+                    epochFeesData[i] += ' ';
+                }
+            } else if (i == EPOCH_FEES_DATA_SIZE - 1) {
+                for (int j = 0; j < 50 - size; ++j) {
                     epochFeesData[i] += ' ';
                 }
             } else {
@@ -775,15 +809,15 @@ namespace catapult { namespace plugins {
     void updateEpochFeeFile() {
         FILE *file = std::fopen("epochFees.txt", "w"); // erase and rewrite the data
         fclose(file);
-        std::deque<std::tuple<uint64_t, uint64_t, uint64_t>>::iterator it;
+        std::deque<std::tuple<uint64_t, uint64_t, uint64_t, std::string>>::iterator it;
         for (it = epochFees.begin(); it != epochFees.end(); ++it) {
-            addEpochFeeEntryToFile(std::get<0>(*it), std::get<1>(*it), std::get<2>(*it));
+            addEpochFeeEntryToFile(std::get<0>(*it), std::get<1>(*it), std::get<2>(*it), std::get<3>(*it));
         }
     }
 
     std::string epochFeeToString() {
         std::string list = "height:   collected:  feeToPay:  \n";
-        std::deque<std::tuple<uint64_t, uint64_t, uint64_t>>::iterator it;
+        std::deque<std::tuple<uint64_t, uint64_t, uint64_t, std::string>>::iterator it;
         long length = 0;
         for (it = epochFees.begin(); it != epochFees.end(); ++it) {
             list += std::to_string(std::get<0>(*it));
@@ -798,6 +832,10 @@ namespace catapult { namespace plugins {
             length = std::to_string(std::get<2>(*it)).length();
             for (int i = 0; i < 12 - length; ++i)
                 list += ' ';
+            list += (std::get<3>(*it));
+            length = std::get<3>(*it).length();
+            for (int i = 0; i < 50 - length; ++i)
+                list += ' ';
             list += '\n';
         }
         return list;
@@ -806,7 +844,8 @@ namespace catapult { namespace plugins {
     void loadEpochFeeFromFile() {
         long size;
         bool errors = false;
-        std::string blockHeight = "", collectedFees = "", currentFee = "";
+        char character;
+        std::string blockHeight = "", collectedFees = "", currentFee = "", address = "";
         epochFees.clear();
         FILE *file = std::fopen("epochFees.txt", "r+");
         if (!file) {
@@ -819,7 +858,7 @@ namespace catapult { namespace plugins {
             CATAPULT_LOG(error) << "Error: problem with fseek in epochFees.txt file\n";
             fclose(file);
             return;
-        } else if (size % 34 > 0) {
+        } else if (size % 84 > 0) {
             CATAPULT_LOG(error) << "Error: epochFees.txt content is invalid\n";
             fclose(file);
             return;
@@ -829,15 +868,21 @@ namespace catapult { namespace plugins {
             blockHeight = "";
             collectedFees = "";
             currentFee = "";
+            address = "";
             for (int i = 0; i < 10 && !feof(file); ++i) {
                 blockHeight += (char)getc(file);
             } for (int i = 0; i < 12 && !feof(file); ++i) {
                 collectedFees += (char)getc(file);;
             } for (int i = 0; i < 12 && !feof(file); ++i) {
                 currentFee += (char)getc(file);;
+            } for (int i = 0; i < 50 && !feof(file); ++i) {
+                character = (char)getc(file);
+                if (character != ' ') {
+                    address += character;
+                }
             }
 
-            errors = !addEpochFeeEntry(std::stoul(blockHeight), std::stoul(collectedFees), std::stoul(currentFee), false);
+            errors = !addEpochFeeEntry(std::stoul(blockHeight), std::stoul(collectedFees), std::stoul(currentFee), address, false);
             if (errors) {
                 CATAPULT_LOG(error) << "Fatal error: epochFees.txt file is corrupt/invalid\n";
                 break;

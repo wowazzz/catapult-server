@@ -151,13 +151,13 @@ namespace catapult { namespace plugins {
             {300u, 20, 5}
         };
 
-        std::tuple<uint64_t, uint64_t, uint64_t> mockEpochFees[MOCK_EPOCH_FEE_ENTRIES] = {
+        std::tuple<uint64_t, uint64_t, uint64_t, std::string> mockEpochFees[MOCK_EPOCH_FEE_ENTRIES] = {
             // Should be sorted by the blockHeight from the lowest (top) to the highest (bottom)
             // <blockHeight, fees collected this epoch, fee paid for a block>
-            {0u, 5, 5},
-            {100u, 10, 5},
-            {200u, 15, 5},
-            {300u, 20, 5}
+            {0u, 5, 5, "address"},
+            {100u, 10, 5, "address"},
+            {200u, 15, 5, "address"},
+            {300u, 20, 5, "address"}
         };
 
         void generateEpochFees() {
@@ -199,6 +199,14 @@ namespace catapult { namespace plugins {
             EXPECT_EQ(std::get<0>(supply), std::get<0>(supply2));
             EXPECT_EQ(std::get<1>(supply), std::get<1>(supply2));
             EXPECT_EQ(std::get<2>(supply), std::get<2>(supply2));
+        }
+
+        void compareTotalEpochFees(std::tuple<uint64_t, uint64_t, uint64_t, std::string> entry,
+            std::tuple<uint64_t, uint64_t, uint64_t, std::string> entry2) {
+            EXPECT_EQ(std::get<0>(entry), std::get<0>(entry2));
+            EXPECT_EQ(std::get<1>(entry), std::get<1>(entry2));
+            EXPECT_EQ(std::get<2>(entry), std::get<2>(entry2));
+            EXPECT_EQ(std::get<3>(entry), std::get<3>(entry2));
         }
 
         double getMockPriceAverage(uint64_t end, uint64_t start = 0) {
@@ -669,7 +677,7 @@ namespace catapult { namespace plugins {
 
         TEST(TEST_CLASS, getFeeToPayTest_UpdateBlock) {
             resetTests();
-            epochFees.push_back({719, 720, 3});
+            epochFees.push_back({719, 720, 3, "address"});
             uint64_t fee = getFeeToPay(720);
             EXPECT_EQ(fee, 1);
             EXPECT_EQ(feeToPay, 1);
@@ -684,8 +692,8 @@ namespace catapult { namespace plugins {
 
         TEST(TEST_CLASS, getFeeToPayTest_Rollback) {
             resetTests();
-            epochFees.push_back({719, 1440, 3});
-            epochFees.push_back({720, 0, 2});
+            epochFees.push_back({719, 1440, 3, "address"});
+            epochFees.push_back({720, 0, 2, "address"});
             uint64_t fee = getFeeToPay(720, true);
             EXPECT_EQ(fee, 2);
             EXPECT_EQ(feeToPay, 2);
@@ -892,15 +900,15 @@ namespace catapult { namespace plugins {
         TEST(TEST_CLASS, CanAddTotalEpochFeeEntry) {
             resetTests();
             EXPECT_EQ(epochFees.size(), 0);
-            addEpochFeeEntry(1u, 2u, 2u);
+            addEpochFeeEntry(1u, 2u, 2u, "address");
             EXPECT_EQ(epochFees.size(), 1);
             EXPECT_EQ(std::get<0>(epochFees.front()), 1);
 	    }
 
         TEST(TEST_CLASS, CantAddInvalidEpochFeeEntries) {
             resetTests();
-            addEpochFeeEntry(5u, 10u, 10u);
-            addEpochFeeEntry(3, 1, 1); // block lower than the previous
+            addEpochFeeEntry(5u, 10u, 10u, "address");
+            addEpochFeeEntry(3, 1, 1, "address"); // block lower than the previous
             EXPECT_EQ(epochFees.size(), 1);
 	    }
 
@@ -912,7 +920,7 @@ namespace catapult { namespace plugins {
             uint64_t collectedFees = std::get<1>(mockEpochFees[MOCK_EPOCH_FEE_ENTRIES - 3]);
             uint64_t blockFee = std::get<2>(mockEpochFees[MOCK_EPOCH_FEE_ENTRIES - 3]);
             generateEpochFees();
-            removeEpochFeeEntry(blockHeight, collectedFees, blockFee);
+            removeEpochFeeEntry(blockHeight, collectedFees, blockFee, "address");
             EXPECT_EQ(epochFees.size(), remainingPricesExpected);
 	    }
 
@@ -925,7 +933,7 @@ namespace catapult { namespace plugins {
             uint64_t blockHeight = 751;
             uint64_t collectedFees = 696;
             uint64_t blockFee = 69;
-            removeEpochFeeEntry(blockHeight, collectedFees, blockFee);
+            removeEpochFeeEntry(blockHeight, collectedFees, blockFee, "address");
             EXPECT_EQ(epochFees.size(), remainingPricesExpected);
 	    }
         
@@ -937,9 +945,9 @@ namespace catapult { namespace plugins {
             resetTests();
             loadEpochFeeFromFile();
             EXPECT_EQ(epochFees.size(), 1);
-            std::deque<std::tuple<uint64_t, uint64_t, uint64_t>>::iterator it = epochFees.begin();
+            std::deque<std::tuple<uint64_t, uint64_t, uint64_t, std::string>>::iterator it = epochFees.begin();
             for (int i = MOCK_EPOCH_FEE_ENTRIES - 1; i < MOCK_EPOCH_FEE_ENTRIES; ++i) {
-                compareTotalSupply(*it++, mockEpochFees[i]);
+                compareTotalEpochFees(*it++, mockEpochFees[i]);
             }
 	    }
 

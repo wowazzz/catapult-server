@@ -2,6 +2,7 @@
 #include <deque>
 #include "stdint.h"
 #include "catapult/types.h"
+#include <string>
 
 namespace catapult {
 	namespace plugins {
@@ -13,7 +14,7 @@ namespace catapult {
 		extern std::deque<std::tuple<uint64_t, uint64_t, uint64_t>> totalSupply;
 
         // block height, collected fees this epoch and fees paid for a block (average block fee last epoch)
-		extern std::deque<std::tuple<uint64_t, uint64_t, uint64_t>> epochFees;
+		extern std::deque<std::tuple<uint64_t, uint64_t, uint64_t, std::string>> epochFees;
 
         extern double currentMultiplier;
         extern uint64_t feeToPay; // fee to pay this epoch
@@ -58,9 +59,9 @@ namespace catapult {
         //region epoch_fees_helper
 
         void removeOldEpochFeeEntries(uint64_t blockHeight);
-        bool addEpochFeeEntry(uint64_t blockHeight, uint64_t collectedFees, uint64_t currentFee, bool addToFile = true);
-        void removeEpochFeeEntry(uint64_t blockHeight, uint64_t collectedFees, uint64_t blockFee);
-        void addEpochFeeEntryToFile(uint64_t blockHeight, uint64_t supplyAmount, uint64_t blockFee);
+        bool addEpochFeeEntry(uint64_t blockHeight, uint64_t collectedFees, uint64_t currentFee, std:: string address, bool addToFile = true);
+        void removeEpochFeeEntry(uint64_t blockHeight, uint64_t collectedFees, uint64_t blockFee, std::string address);
+        void addEpochFeeEntryToFile(uint64_t blockHeight, uint64_t supplyAmount, uint64_t blockFee, std::string address);
         void updateEpochFeeFile();
         std::string epochFeeToString();
         void loadEpochFeeFromFile();
