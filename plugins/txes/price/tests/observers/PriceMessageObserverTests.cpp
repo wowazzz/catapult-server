@@ -25,16 +25,21 @@
 #include "tests/test/nodeps/Filesystem.h"
 #include "tests/test/plugins/ObserverTestUtils.h"
 #include "tests/TestHarness.h"
+#include "src/observers/priceUtil.h"
+#include <queue>
+#include "stdint.h"
 
 namespace catapult { namespace observers {
 
 #define TEST_CLASS PriceMessageObserverTests
 
-	DEFINE_COMMON_OBSERVER_TESTS(PriceMessage, 0, config::CatapultDirectory(""))
+	DEFINE_COMMON_OBSERVER_TESTS(PriceMessage)
 
 	// region traits
 
 	namespace {
+		using namespace catapult::plugins;
+
 		struct CommitTraits {
 			static constexpr uint8_t Message_First_Byte = 0;
 			static constexpr auto Notify_Mode = NotifyMode::Commit;
@@ -63,69 +68,27 @@ namespace catapult { namespace observers {
 			{}
 
 		public:
-			size_t countFiles() {
-				return test::CountFilesAndDirectories(m_tempDir.name());
-			}
-
-			uint64_t readIndexFile() const {
-				return io::IndexFile((std::filesystem::path(m_tempDir.name()) / "index.dat").generic_string()).get();
-			}
-
-			std::vector<uint8_t> readAll(const std::string& name) {
-				io::RawFile dataFile((std::filesystem::path(m_tempDir.name()) / name).generic_string(), io::OpenMode::Read_Only);
-				std::vector<uint8_t> buffer(dataFile.size());
-				dataFile.read(buffer);
-				return buffer;
-			}
-
-		public:
 			void observe(const model::PriceMessageNotification& notification) {
-				auto pObserver = CreatePriceMessageObserver(0x1122334455667788, config::CatapultDirectory(m_tempDir.name()));
-
+				auto pObserver = CreatePriceMessageObserver();
 				test::ObserverTestContext context(m_notifyMode);
+
+				priceList.clear();
+				if (m_notifyMode == NotifyMode::Rollback)
+					priceList.push_front({3u, 1u, 1u, 1}); // add a price to remove
+
 				test::ObserveNotification(*pObserver, notification, context);
+
+				if (m_notifyMode == NotifyMode::Rollback)
+					EXPECT_EQ(priceList.size(), 0); // removes the price
+
+				if (m_notifyMode == NotifyMode::Commit)
+					EXPECT_EQ(priceList.size(), 1); // adds a price
 			}
 
 		private:
 			NotifyMode m_notifyMode;
 			test::TempDirectoryGuard m_tempDir;
 		};
-	}
-
-	// endregion
-
-	// region filtered - no files created
-
-	namespace {
-		template<typename TTraits>
-		void AssertInvalidMarker(const std::vector<uint8_t>& message) {
-			// Arrange:
-			PriceMessageObserverTestContext context(TTraits::Notify_Mode);
-
-			auto sender = test::GenerateRandomByteArray<Key>();
-			//auto recipient = test::GenerateRandomByteArray<Address>();
-			//auto unresolvedRecipient = test::UnresolveXor(recipient);
-			auto messageSize = static_cast<uint16_t>(message.size());
-			auto notification = model::PriceMessageNotification(sender, messageSize, message.data());
-
-			// Act:
-			context.observe(/*recipient,*/ notification);
-
-			// Assert:
-			EXPECT_EQ(0u, context.countFiles());
-		}
-	}
-
-	MESSAGE_OBSERVER_TRAITS_BASED_TEST(NoMessageIsWrittenWhenMessagePayloadIsLessThanMarkerSize) {
-		AssertInvalidMarker<TTraits>({ 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22 });
-	}
-
-	MESSAGE_OBSERVER_TRAITS_BASED_TEST(NoMessageIsWrittenWhenMessagePayloadOnlyContainsMarker) {
-		AssertInvalidMarker<TTraits>({ 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11 });
-	}
-
-	MESSAGE_OBSERVER_TRAITS_BASED_TEST(NoMessageIsWrittenWhenMarkerDoesNotMatch) {
-		AssertInvalidMarker<TTraits>({ 0x88, 0x77, 0x66, 0x5A, 0x44, 0x33, 0x22, 0x11, 0xAB, 0xCD, 0x82 });
 	}
 
 	// endregion
@@ -137,26 +100,10 @@ namespace catapult { namespace observers {
 		PriceMessageObserverTestContext context(TTraits::Notify_Mode);
 
 		auto sender = test::GenerateRandomByteArray<Key>();
-		//auto recipient = test::GenerateRandomByteArray<Address>();
-		//auto unresolvedRecipient = test::UnresolveXor(recipient);
-		auto message = std::vector<uint8_t>{ 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0xAB, 0xCD, 0x82 };
-		auto messageSize = static_cast<uint16_t>(message.size());
-		auto notification = model::PriceMessageNotification(sender, messageSize, message.data());
+		auto notification = model::PriceMessageNotification(sender, 3u, 1u, 1u);
 
 		// Act:
-		context.observe(/*recipient,*/ notification);
-
-		// Assert:
-		EXPECT_EQ(2u, context.countFiles());
-		EXPECT_EQ(1u, context.readIndexFile());
-
-		auto expectedMessagePayloadSize = 3u;
-		auto messageFileContents = context.readAll("0000000000000000.dat");
-		ASSERT_EQ(1 + Key::Size + expectedMessagePayloadSize, messageFileContents.size());
-
-		EXPECT_EQ(TTraits::Message_First_Byte, messageFileContents[0]);
-		EXPECT_EQ(sender, reinterpret_cast<const Key&>(messageFileContents[1]));
-		EXPECT_EQ_MEMORY(&message[sizeof(uint64_t)], &messageFileContents[1 + Key::Size], expectedMessagePayloadSize);
+		context.observe(notification);
 	}
 
 	// endregion

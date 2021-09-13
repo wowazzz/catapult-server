@@ -36,13 +36,7 @@ namespace catapult { namespace plugins {
 			static void RunTestAfterRegistration(TAction action) {
 				// Arrange:
 				auto config = model::BlockChainConfiguration::Uninitialized();
-				config.Plugins.emplace("catapult.plugins.price", utils::ConfigurationBag({{ "", { { "maxMessageSize", "0" } } }}));
-
-				auto userConfig = config::UserConfiguration::Uninitialized();
-				userConfig.CertificateDirectory = test::GetDefaultCertificateDirectory();
-				userConfig.EnableDelegatedHarvestersAutoDetection = EnableAutoDetection;
-
-				auto manager = test::CreatePluginManager(config, userConfig);
+				auto manager = test::CreatePluginManager(config);
 				RegisterPriceSubsystem(manager);
 
 				// Act:
@@ -55,7 +49,7 @@ namespace catapult { namespace plugins {
 			}
 
 			static std::vector<std::string> GetStatelessValidatorNames() {
-				return { "PriceMessageValidator", "PriceMosaicsValidator" };
+				return { "PriceMessageValidator" };
 			}
 		};
 
@@ -73,6 +67,5 @@ namespace catapult { namespace plugins {
 		};
 	}
 
-	//DEFINE_PLUGIN_TESTS(PricePluginWithoutMessageProcessingTests, PricePluginWithoutMessageProcessingTraits)
-	//DEFINE_PLUGIN_TESTS(PricePluginWithMessageProcessingTests, PricePluginWithMessageProcessingTraits)
+	DEFINE_PLUGIN_TESTS(PricePluginWithMessageProcessingTests, PricePluginWithMessageProcessingTraits)
 }}

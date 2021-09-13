@@ -38,27 +38,15 @@ namespace catapult { namespace model {
 		DEFINE_TRANSACTION_CONSTANTS(Entity_Type_Price, 1)
 
 	public:
+		uint64_t blockHeight;
+		// High and low prices
+		uint64_t highPrice;
+		uint64_t lowPrice;
 
-		/// Message size in bytes.
-		uint16_t MessageSize;
-
-		// followed by message data if MessageSize != 0
-		DEFINE_TRANSACTION_VARIABLE_DATA_ACCESSORS(Message, uint8_t)
-
-	private:
-
-		template<typename T>
-		static auto* MessagePtrT(T& transaction) {
-			auto* pPayloadStart = THeader::PayloadStart(transaction);
-			return transaction.MessageSize && pPayloadStart
-					? pPayloadStart
-					: nullptr;
-		}
-
-	public:
-		/// Calculates the real size of price \a transaction.
 		static constexpr uint64_t CalculateRealSize(const TransactionType& transaction) noexcept {
-			return sizeof(TransactionType) + transaction.MessageSize;
+			if (!transaction.lowPrice)
+				return sizeof(TransactionType) + 0u;
+			return sizeof(TransactionType);
 		}
 	};
 

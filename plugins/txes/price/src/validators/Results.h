@@ -27,10 +27,12 @@ namespace catapult { namespace validators {
 
 #endif
 /// Defines a transfer validation result with \a DESCRIPTION and \a CODE.
-#define DEFINE_PRICE_RESULT(DESCRIPTION, CODE) DEFINE_VALIDATION_RESULT(Failure, Transfer, DESCRIPTION, CODE, None)
+#define DEFINE_PRICE_RESULT(DESCRIPTION, CODE) DEFINE_VALIDATION_RESULT(Failure, Price, DESCRIPTION, CODE, None)
 
-	/// Validation failed because the message is too large.
-	DEFINE_PRICE_RESULT(Message_Too_Large, 1);
+	DEFINE_PRICE_RESULT(lowPrice_not_set, 1);
+	DEFINE_PRICE_RESULT(highPrice_not_set, 2);
+	DEFINE_PRICE_RESULT(lowPrice_and_highPrice_not_set, 3);
+	DEFINE_PRICE_RESULT(lowPrice_is_higher_than_highPrice, 4);
 
 #ifndef CUSTOM_RESULT_DEFINITION
 }}

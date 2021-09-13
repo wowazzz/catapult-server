@@ -21,7 +21,6 @@
 
 #include "PricePlugin.h"
 #include "PriceTransactionPlugin.h"
-#include "src/config/PriceConfiguration.h"
 #include "src/observers/Observers.h"
 #include "src/validators/Validators.h"
 #include "catapult/config/CatapultDataDirectory.h"
@@ -34,21 +33,13 @@ namespace catapult { namespace plugins {
 
 	void RegisterPriceSubsystem(PluginManager& manager) {
 		manager.addTransactionSupport(CreatePriceTransactionPlugin());
-
-		auto config = model::LoadPluginConfiguration<config::PriceConfiguration>(manager.config(), "catapult.plugins.price");
-		manager.addStatelessValidatorHook([config](auto& builder) {
-			builder.add(validators::CreatePriceMessageValidator(config.MaxMessageSize));
+    
+		manager.addStatelessValidatorHook([](auto& builder) {
+			builder.add(validators::CreatePriceMessageValidator());
 		});
 
-		if (!manager.userConfig().EnableDelegatedHarvestersAutoDetection)
-			return;
-
-		//auto encryptionPrivateKeyPemFilename = config::GetNodePrivateKeyPemFilename(manager.userConfig().CertificateDirectory);
-		//auto encryptionPublicKey = crypto::ReadPublicKeyFromPrivateKeyPemFile(encryptionPrivateKeyPemFilename);
-		//auto recipient = model::PublicKeyToAddress(encryptionPublicKey, manager.config().Network.Identifier);
-		auto dataDirectory = config::CatapultDataDirectory(manager.userConfig().DataDirectory);
-		manager.addObserverHook([dataDirectory](auto& builder) {
-			builder.add(observers::CreatePriceMessageObserver(0xE201735761802AFE, dataDirectory.dir("transfer_message")));
+		manager.addObserverHook([](auto& builder) {
+			builder.add(observers::CreatePriceMessageObserver());
 		});
 	}
 }}

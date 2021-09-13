@@ -23,33 +23,28 @@
 #include "catapult/config/CatapultDataDirectory.h"
 #include "catapult/io/FileQueue.h"
 #include "catapult/io/PodIoUtils.h"
+#include "priceUtil.h"
 
 namespace catapult { namespace observers {
 
 	namespace {
-		constexpr auto Marker_Size = sizeof(uint64_t);
-
 		using Notification = model::PriceMessageNotification;
+		const std::array<uint8_t, 32> byteArray = {
+			83, 100, 169, 75, 106, 36, 168, 7, 123, 184, 234, 67, 250, 158,
+			178, 4, 126, 246, 156, 245, 68, 36, 169, 224, 201, 65, 226, 192,
+			189, 224, 218, 253
+		};
 	}
 
-	DECLARE_OBSERVER(PriceMessage, Notification)(
-			uint64_t marker,
-			const config::CatapultDirectory& directory) {
-		return MAKE_OBSERVER(PriceMessage, Notification, ([marker, directory](
-				const Notification& notification,
-				ObserverContext& context) {
-			if (notification.MessageSize <= Marker_Size || marker != reinterpret_cast<const uint64_t&>(*notification.MessagePtr))
-				return;
+	DEFINE_OBSERVER(PriceMessage, Notification, [](
+		const Notification& notification,
+		const ObserverContext& context) {
 
-			io::FileQueueWriter writer(directory.str());
-			io::Write8(writer, NotifyMode::Commit == context.Mode ? 0 : 1);
-			writer.write(notification.SenderPublicKey);
-			writer.write({ notification.MessagePtr + Marker_Size, notification.MessageSize - Marker_Size });
-			writer.flush();
-
-			/*
-				To implement the fee multiplier/ something update...
-			*/
-		}));
-	}
+		Key publisher = Key(byteArray);
+		
+		if (notification.SenderPublicKey == publisher) {
+			catapult::plugins::processPriceTransaction(notification.blockHeight, notification.lowPrice,
+				notification.highPrice, context.Mode == NotifyMode::Rollback);
+		}
+	})
 }}

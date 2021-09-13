@@ -31,9 +31,9 @@ namespace catapult { namespace model {
 
 #define TEST_CLASS PriceTransactionTests
 
-	// region size + alignment + properties
+	// region size + properties
 
-#define TRANSACTION_FIELDS FIELD(MessageSize)
+#define TRANSACTION_FIELDS FIELD(blockHeight) FIELD(lowPrice) FIELD(highPrice)
 
 	namespace {
 		template<typename T>
@@ -47,16 +47,7 @@ namespace catapult { namespace model {
 
 			// Assert:
 			EXPECT_EQ(expectedSize, sizeof(T));
-			EXPECT_EQ(baseSize + sizeof(uint16_t), sizeof(T));
-		}
-
-		template<typename T>
-		void AssertTransactionHasProperAlignment() {
-/*#define FIELD(X) EXPECT_ALIGNED(T, X);
-			TRANSACTION_FIELDS
-#undef FIELD
-
-			EXPECT_EQ(0u, sizeof(T) % 8);*/
+			EXPECT_EQ(baseSize + sizeof(uint64_t) * 3, sizeof(T));
 		}
 
 		template<typename T>
@@ -69,65 +60,14 @@ namespace catapult { namespace model {
 
 #undef TRANSACTION_FIELDS
 
-	ADD_BASIC_TRANSACTION_SIZE_PROPERTY_TESTS(Price)
+	ADD_BASIC_TRANSACTION_PROPERTY_TESTS_WITH_ARGS(Price)
 
-	// endregion
-
-	// region data pointers
-
-	namespace {
-		struct PriceTransactionTraits {
-			static auto GenerateEntityWithAttachments(uint8_t numMosaics, uint16_t messageSize) {
-				uint32_t entitySize = SizeOf32<PriceTransaction>() + messageSize + numMosaics * SizeOf32<UnresolvedMosaic>();
-				auto pTransaction = utils::MakeUniqueWithSize<PriceTransaction>(entitySize);
-				pTransaction->Size = entitySize;
-				pTransaction->MessageSize = messageSize;
-				return pTransaction;
-			}
-
-			static constexpr size_t GetAttachment1Size(uint8_t numMosaics) {
-				return numMosaics * sizeof(UnresolvedMosaic);
-			}
-
-			template<typename TEntity>
-			static auto GetAttachmentPointer(TEntity& entity) {
-				return entity.MessagePtr();
-			}
-		};
+	TEST(PriceTransactionTests, TransactionHasExpectedSize) {
+		AssertTransactionHasExpectedSize<PriceTransaction>(sizeof(Transaction));
 	}
 
-	//DEFINE_DUAL_ATTACHMENT_POINTER_TESTS(TEST_CLASS, PriceTransactionTraits)
-
-	// endregion
-
-	// region CalculateRealSize
-
-	TEST(TEST_CLASS, CanCalculateRealSizeWithReasonableValues) {
-		// Arrange:
-		PriceTransaction transaction;
-		transaction.Size = 0;
-		transaction.MessageSize = 100;
-
-		// Act:
-		auto realSize = PriceTransaction::CalculateRealSize(transaction);
-
-		// Assert:
-		EXPECT_EQ(sizeof(PriceTransaction) + 100, realSize);
-	}
-
-	TEST(TEST_CLASS, CalculateRealSizeDoesNotOverflowWithMaxValues) {
-		// Arrange:
-		PriceTransaction transaction;
-		test::SetMaxValue(transaction.Size);
-		test::SetMaxValue(transaction.MessageSize);
-
-		// Act:
-		auto realSize = PriceTransaction::CalculateRealSize(transaction);
-
-		// Assert:
-		ASSERT_EQ(0xFFFFFFFF, transaction.Size);
-		EXPECT_EQ(sizeof(PriceTransaction) + 0xFFFF, realSize);
-		EXPECT_GT(0xFFFFFFFF, realSize);
+	TEST(PriceTransactionTests, EmbeddedTransactionHasExpectedSize) {
+		AssertTransactionHasExpectedSize<EmbeddedPriceTransaction>(sizeof(EmbeddedTransaction));
 	}
 
 	// endregion

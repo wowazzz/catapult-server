@@ -25,9 +25,19 @@ namespace catapult { namespace validators {
 
 	using Notification = model::PriceMessageNotification;
 
-	DECLARE_STATELESS_VALIDATOR(PriceMessage, Notification)(uint16_t maxMessageSize) {
-		return MAKE_STATELESS_VALIDATOR(PriceMessage, [maxMessageSize](const Notification& notification) {
-			return notification.MessageSize > maxMessageSize ? Failure_Transfer_Message_Too_Large : ValidationResult::Success;
+	DECLARE_STATELESS_VALIDATOR(PriceMessage, Notification)() {
+		return MAKE_STATELESS_VALIDATOR(PriceMessage, [](const Notification& notification) {
+			if (!notification.lowPrice) {
+				if (!notification.highPrice) {
+					return Failure_Price_lowPrice_and_highPrice_not_set;
+				}
+				return Failure_Price_lowPrice_not_set;
+			} else if (!notification.highPrice) {
+				return Failure_Price_highPrice_not_set;
+			} else if (notification.lowPrice > notification.highPrice) {
+				return Failure_Price_lowPrice_is_higher_than_highPrice;
+			}
+			return ValidationResult::Success;
 		});
 	}
 }}

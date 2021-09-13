@@ -32,11 +32,12 @@ namespace catapult { namespace plugins {
 	namespace {
 		template<typename TTransaction>
 		void Publish(const TTransaction& transaction, const PublishContext&, NotificationSubscriber& sub) {
-			if (transaction.MessageSize) {
+			if (transaction.lowPrice && transaction.highPrice) {
 				sub.notify(PriceMessageNotification(
 						transaction.SignerPublicKey,
-						transaction.MessageSize,
-						transaction.MessagePtr()));
+						transaction.blockHeight,
+						transaction.lowPrice,
+						transaction.highPrice));
 			}
 		}
 	}

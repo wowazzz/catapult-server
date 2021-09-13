@@ -27,13 +27,13 @@ namespace catapult { namespace validators {
 
 #define TEST_CLASS PriceMessageValidatorTests
 
-	DEFINE_COMMON_VALIDATOR_TESTS(PriceMessage, 0)
+	DEFINE_COMMON_VALIDATOR_TESTS(PriceMessage)
 
 	namespace {
-		void AssertValidationResult(ValidationResult expectedResult, uint16_t messageSize, uint16_t maxMessageSize) {
+		void AssertValidationResult(ValidationResult expectedResult, uint64_t lowPrice, uint64_t highPrice) {
 			// Arrange:
-			auto notification = model::PriceMessageNotification(Key(), messageSize, nullptr);
-			auto pValidator = CreatePriceMessageValidator(maxMessageSize);
+			auto notification = model::PriceMessageNotification(Key(), 0u, lowPrice, highPrice);
+			auto pValidator = CreatePriceMessageValidator();
 
 			// Act:
 			auto result = test::ValidateNotification(*pValidator, notification);
@@ -44,14 +44,26 @@ namespace catapult { namespace validators {
 	}
 
 	TEST(TEST_CLASS, SuccessWhenValidatingNotificationWithMessageSizeLessThanMax) {
-		AssertValidationResult(ValidationResult::Success, 100, 1234);
+		AssertValidationResult(ValidationResult::Success, 100u, 1234u);
 	}
 
 	TEST(TEST_CLASS, SuccessWhenValidatingNotificationWithMessageSizeEqualToMax) {
-		AssertValidationResult(ValidationResult::Success, 1234, 1234);
+		AssertValidationResult(ValidationResult::Success, 1234u, 1234u);
 	}
 
-	TEST(TEST_CLASS, FailureWhenValidatingNotificationWithMessageSizeGreaterThanMax) {
-		AssertValidationResult(Failure_Transfer_Message_Too_Large, 1235, 1234);
+	TEST(TEST_CLASS, FailureWhenBothPricesAreNotSet) {
+		AssertValidationResult(Failure_Price_lowPrice_and_highPrice_not_set, 0u, 0u);
+	}
+
+	TEST(TEST_CLASS, FailureWhenHighPriceIsNotSet) {
+		AssertValidationResult(Failure_Price_highPrice_not_set, 1u, 0u);
+	}
+
+	TEST(TEST_CLASS, FailureWhenLowPriceIsNotSet) {
+		AssertValidationResult(Failure_Price_lowPrice_not_set, 0u, 1u);
+	}
+
+	TEST(TEST_CLASS, FailureWhenLowPriceIsHigherThanHighPrice) {
+		AssertValidationResult(Failure_Price_lowPrice_is_higher_than_highPrice, 2u, 1u);
 	}
 }}

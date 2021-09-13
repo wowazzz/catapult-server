@@ -40,14 +40,15 @@ namespace catapult { namespace plugins {
 		DEFINE_TRANSACTION_PLUGIN_TEST_TRAITS(Price, 1, 1,)
 
 		template<typename TTraits>
-		auto CreatePriceTransaction(uint16_t messageSize = 0) {
+		auto CreatePriceTransaction(uint64_t lowPrice, uint64_t highPrice) {
 			using TransactionType = typename TTraits::TransactionType;
-			uint32_t entitySize = SizeOf32<TransactionType>() + messageSize;
+			uint32_t entitySize = SizeOf32<TransactionType>();
 			auto pTransaction = utils::MakeUniqueWithSize<TransactionType>(entitySize);
 			test::FillWithRandomData({ reinterpret_cast<uint8_t*>(pTransaction.get()), entitySize });
 
 			pTransaction->Size = entitySize;
-			pTransaction->MessageSize = messageSize;
+			pTransaction->lowPrice = lowPrice;
+			pTransaction->highPrice = highPrice;
 			return pTransaction;
 		}
 	}
@@ -63,9 +64,8 @@ namespace catapult { namespace plugins {
 		void AddCommonExpectations(
 				typename test::TransactionPluginTestUtils<TTraits>::PublishTestBuilder& builder,
 				const typename TTraits::TransactionType& transaction) {
-			builder.template addExpectation<AddressInteractionNotification>([&transaction](const auto& notification) {
-				EXPECT_EQ(GetSignerAddress(transaction), notification.Source);
-				EXPECT_EQ(transaction.Type, notification.TransactionType);
+			builder.template addExpectation<PriceMessageNotification>([&transaction](const auto& notification) {
+				EXPECT_EQ(transaction.SignerPublicKey, notification.SenderPublicKey);
 			});
 		}
 	}
@@ -74,13 +74,12 @@ namespace catapult { namespace plugins {
 		// Arrange:
 		typename TTraits::TransactionType transaction;
 		test::FillWithRandomData(transaction);
-		transaction.MessageSize = 0;
+		transaction.lowPrice = 1;
+		transaction.highPrice = 2;
 
 		// Act + Assert:
 		test::TransactionPluginTestUtils<TTraits>::AssertNotificationTypes(transaction, {
-			InternalPaddingNotification::Notification_Type,
-			AccountAddressNotification::Notification_Type,
-			AddressInteractionNotification::Notification_Type
+			PriceMessageNotification::Notification_Type
 		});
 	}
 
@@ -88,7 +87,8 @@ namespace catapult { namespace plugins {
 		// Arrange:
 		typename TTraits::TransactionType transaction;
 		test::FillWithRandomData(transaction);
-		transaction.MessageSize = 0;
+		transaction.lowPrice = 1;
+		transaction.highPrice = 2;
 
 		typename test::TransactionPluginTestUtils<TTraits>::PublishTestBuilder builder;
 		AddCommonExpectations<TTraits>(builder, transaction);
@@ -105,28 +105,25 @@ namespace catapult { namespace plugins {
 		template<typename TTransaction>
 		void PrepareMessageOnlyTransaction(TTransaction& transaction) {
 			test::FillWithRandomData(transaction);
-			transaction.MessageSize = 17;
-			transaction.Size = static_cast<uint32_t>(TTransaction::CalculateRealSize(transaction));
+			transaction.lowPrice = 1;
+			transaction.highPrice = 2;
 		}
 	}
 
 	PLUGIN_TEST(CanPublishAllNotificationsInCorrectOrderWhenMessageOnlyIsPresent) {
 		// Arrange:
-		auto pTransaction = CreatePriceTransaction<TTraits>(17);
+		auto pTransaction = CreatePriceTransaction<TTraits>(1, 2);
 		PrepareMessageOnlyTransaction(*pTransaction);
 
 		// Act + Assert:
 		test::TransactionPluginTestUtils<TTraits>::AssertNotificationTypes(*pTransaction, {
-			InternalPaddingNotification::Notification_Type,
-			AccountAddressNotification::Notification_Type,
-			AddressInteractionNotification::Notification_Type,
 			PriceMessageNotification::Notification_Type
 		});
 	}
 
 	PLUGIN_TEST(CanPublishAllNotificationsWhenMessageOnlyIsPresent) {
 		// Arrange:
-		auto pTransaction = CreatePriceTransaction<TTraits>(17);
+		auto pTransaction = CreatePriceTransaction<TTraits>(1, 2);
 		PrepareMessageOnlyTransaction(*pTransaction);
 
 		const auto& transaction = *pTransaction;
@@ -134,8 +131,12 @@ namespace catapult { namespace plugins {
 		AddCommonExpectations<TTraits>(builder, transaction);
 		builder.template addExpectation<PriceMessageNotification>([&transaction](const auto& notification) {
 			EXPECT_EQ(transaction.SignerPublicKey, notification.SenderPublicKey);
-			EXPECT_EQ(17u, notification.MessageSize);
-			EXPECT_EQ(transaction.MessagePtr(), notification.MessagePtr);
+
+			EXPECT_EQ(1u, notification.lowPrice);
+			EXPECT_EQ(2u, notification.highPrice);
+			EXPECT_EQ(transaction.lowPrice, 1u);
+			EXPECT_EQ(transaction.highPrice, 2u);
+
 		});
 
 		// Act + Assert:

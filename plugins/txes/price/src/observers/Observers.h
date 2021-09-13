@@ -22,13 +22,13 @@
 #pragma once
 #include "src/model/PriceNotifications.h"
 #include "catapult/observers/ObserverTypes.h"
+#include <queue>
+#include "stdint.h"
 
 namespace catapult { namespace config { class CatapultDirectory; } }
 
 namespace catapult { namespace observers {
 
 	/// Observes price messages starting with \a marker and sent to \a recipient and writes them to \a directory.
-	DECLARE_OBSERVER(PriceMessage, model::PriceMessageNotification)(
-			uint64_t marker,
-			const config::CatapultDirectory& directory);
+	DECLARE_OBSERVER(PriceMessage, model::PriceMessageNotification)();
 }}

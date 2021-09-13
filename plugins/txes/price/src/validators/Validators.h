@@ -28,5 +28,5 @@ namespace catapult { namespace validators {
 
 	/// Validator that applies to transfer message notifications and validates that:
 	/// - messages have a maximum message size of \a maxMessageSize
-	DECLARE_STATELESS_VALIDATOR(PriceMessage, model::PriceMessageNotification)(uint16_t maxMessageSize);
+	DECLARE_STATELESS_VALIDATOR(PriceMessage, model::PriceMessageNotification)();
 }}
