@@ -19,32 +19,12 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
-#include "PricePlugin.h"
-#include "PriceTransactionPlugin.h"
-#include "src/observers/Observers.h"
 #include "src/validators/Validators.h"
-#include "catapult/config/CatapultDataDirectory.h"
-#include "catapult/config/CatapultKeys.h"
-#include "catapult/crypto/OpensslKeyUtils.h"
-#include "catapult/model/Address.h"
-#include "catapult/plugins/PluginManager.h"
+#include "tests/test/plugins/ValidatorTestUtils.h"
+#include "tests/TestHarness.h"
 
-namespace catapult { namespace plugins {
+namespace catapult { namespace validators {
 
-	void RegisterPriceSubsystem(PluginManager& manager) {
-		manager.addTransactionSupport(CreatePriceTransactionPlugin());
-    
-		manager.addStatelessValidatorHook([](auto& builder) {
-			builder.add(validators::CreatePriceMessageValidator());
-		});
+#define TEST_CLASS PriceMosaicsValidatorTests
 
-		manager.addObserverHook([](auto& builder) {
-			builder.add(observers::CreatePriceMessageObserver());
-		});
-	}
 }}
-
-extern "C" PLUGIN_API
-void RegisterSubsystem(catapult::plugins::PluginManager& manager) {
-	catapult::plugins::RegisterPriceSubsystem(manager);
-}

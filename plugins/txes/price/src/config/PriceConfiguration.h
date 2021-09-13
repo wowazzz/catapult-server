@@ -20,13 +20,26 @@
 **/
 
 #pragma once
-#include "catapult/plugins.h"
+#include <stdint.h>
 
-namespace catapult { namespace plugins { class PluginManager; } }
+namespace catapult { namespace utils { class ConfigurationBag; } }
 
-namespace catapult { namespace plugins {
+namespace catapult { namespace config {
 
-	/// Registers price support with \a manager.
-	PLUGIN_API
-	void RegisterPriceSubsystem(PluginManager& manager);
+	/// Price plugin configuration settings.
+	struct PriceConfiguration {
+	public:
+		/// Maximum transaction message size.
+		uint16_t MaxMessageSize;
+
+	private:
+		PriceConfiguration() = default;
+
+	public:
+		/// Creates an uninitialized price configuration.
+		static PriceConfiguration Uninitialized();
+
+		/// Loads a price configuration from \a bag.
+		static PriceConfiguration LoadFromBag(const utils::ConfigurationBag& bag);
+	};
 }}

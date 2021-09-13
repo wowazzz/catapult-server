@@ -19,14 +19,42 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
-#pragma once
-#include "catapult/plugins.h"
+#include "src/config/PriceConfiguration.h"
+#include "tests/test/nodeps/ConfigurationTestUtils.h"
+#include "tests/TestHarness.h"
 
-namespace catapult { namespace plugins { class PluginManager; } }
+namespace catapult { namespace config {
 
-namespace catapult { namespace plugins {
+	namespace {
+		struct PriceConfigurationTraits {
+			using ConfigurationType = PriceConfiguration;
 
-	/// Registers price support with \a manager.
-	PLUGIN_API
-	void RegisterPriceSubsystem(PluginManager& manager);
+			static utils::ConfigurationBag::ValuesContainer CreateProperties() {
+				return {
+					{
+						"",
+						{
+							{ "maxMessageSize", "859" }
+						}
+					}
+				};
+			}
+
+			static bool IsSectionOptional(const std::string&) {
+				return false;
+			}
+
+			static void AssertZero(const PriceConfiguration& config) {
+				// Assert:
+				EXPECT_EQ(0u, config.MaxMessageSize);
+			}
+
+			static void AssertCustom(const PriceConfiguration& config) {
+				// Assert:
+				EXPECT_EQ(859u, config.MaxMessageSize);
+			}
+		};
+	}
+
+	DEFINE_CONFIGURATION_TESTS(PriceConfigurationTests, Price)
 }}

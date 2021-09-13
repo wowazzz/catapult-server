@@ -19,32 +19,20 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
-#include "PricePlugin.h"
-#include "PriceTransactionPlugin.h"
-#include "src/observers/Observers.h"
-#include "src/validators/Validators.h"
-#include "catapult/config/CatapultDataDirectory.h"
-#include "catapult/config/CatapultKeys.h"
-#include "catapult/crypto/OpensslKeyUtils.h"
-#include "catapult/model/Address.h"
-#include "catapult/plugins/PluginManager.h"
+#include "PriceConfiguration.h"
+#include "catapult/utils/ConfigurationBag.h"
+#include "catapult/utils/ConfigurationUtils.h"
 
-namespace catapult { namespace plugins {
+namespace catapult { namespace config {
 
-	void RegisterPriceSubsystem(PluginManager& manager) {
-		manager.addTransactionSupport(CreatePriceTransactionPlugin());
-    
-		manager.addStatelessValidatorHook([](auto& builder) {
-			builder.add(validators::CreatePriceMessageValidator());
-		});
+	PriceConfiguration PriceConfiguration::Uninitialized() {
+		return PriceConfiguration();
+	}
 
-		manager.addObserverHook([](auto& builder) {
-			builder.add(observers::CreatePriceMessageObserver());
-		});
+	PriceConfiguration PriceConfiguration::LoadFromBag(const utils::ConfigurationBag& bag) {
+		PriceConfiguration config;
+		utils::LoadIniProperty(bag, "", "MaxMessageSize", config.MaxMessageSize);
+		utils::VerifyBagSizeExact(bag, 1);
+		return config;
 	}
 }}
-
-extern "C" PLUGIN_API
-void RegisterSubsystem(catapult::plugins::PluginManager& manager) {
-	catapult::plugins::RegisterPriceSubsystem(manager);
-}
