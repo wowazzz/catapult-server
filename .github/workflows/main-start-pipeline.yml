@@ -1,12 +1,9 @@
-name: CI
+name: CI-main
 
-# Run this workflow every time a commit is pushed to main or a pull request is opened against main
+# Run this workflow every time a commit is pushed to main
 on:
   push:
     branches:
-      - main
-  pull_request:
-    branches: 
       - main
 
 jobs:
@@ -18,5 +15,5 @@ jobs:
           uses: Azure/pipelines@v1
           with:
             azure-devops-project-url: https://dev.azure.com/superhow/symbol
-            azure-pipeline-name: 'symbol-docker'
+            azure-pipeline-name: 'symbol-docker-main'
             azure-devops-token: ${{ secrets.AZURE_DEVOPS_TOKEN }}
