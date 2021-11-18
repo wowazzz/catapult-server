@@ -34,7 +34,7 @@ namespace catapult { namespace observers {
 
 #define TEST_CLASS HarvestFeeObserverTests
 
-	DEFINE_COMMON_OBSERVER_TESTS(HarvestFee, { MosaicId(), 0, 0, Address() }, model::InflationCalculator())
+	DEFINE_COMMON_OBSERVER_TESTS(HarvestFee, { MosaicId(), 0, 0, model::HeightDependentAddress(Address()) }, model::InflationCalculator())
 
 	// region traits
 
@@ -122,7 +122,12 @@ namespace catapult { namespace observers {
 
 		template<typename TAction>
 		void RunHarvestFeeObserverTest(NotifyMode notifyMode, uint8_t harvestBeneficiaryPercentage, TAction action) {
-			auto options = HarvestFeeOptions{ Currency_Mosaic_Id, harvestBeneficiaryPercentage, 0, Address() };
+			auto options = HarvestFeeOptions{
+				Currency_Mosaic_Id,
+				harvestBeneficiaryPercentage,
+				0,
+				model::HeightDependentAddress(Address())
+			};
 			RunHarvestFeeObserverTest(notifyMode, options, model::InflationCalculator(), action);
 		}
 	}
@@ -157,7 +162,7 @@ namespace catapult { namespace observers {
 
 			const auto& receipt = static_cast<const model::BalanceChangeReceipt&>(receiptPair.second.receiptAt(0));
 			AssertReceipt(accountStateIter.get().PublicKey, Amount(20), receipt);
-			EXPECT_EQ(catapult::plugins::feeToPay, 20); // Unchanged
+			EXPECT_EQ(catapult::plugins::feeToPay, 20u); // Unchanged
 		});
 	}
 
@@ -312,7 +317,7 @@ namespace catapult { namespace observers {
 			options.CurrencyMosaicId = Currency_Mosaic_Id;
 			options.HarvestBeneficiaryPercentage = harvestBeneficiaryPercentage;
 			options.HarvestNetworkPercentage = harvestNetworkPercentage;
-			options.HarvestNetworkFeeSinkAddress = ToAddress(options.HarvestNetworkFeeSinkPublicKey);
+			options.HarvestNetworkFeeSinkAddress = model::HeightDependentAddress(ToAddress(options.HarvestNetworkFeeSinkPublicKey));
 			return options;
 		}
 	}
@@ -435,6 +440,43 @@ namespace catapult { namespace observers {
 
 	// endregion
 
+	// region sink address height dependence
+
+	TEST(TEST_CLASS, HarvesterSharesFeesAccordingToGivenPercentage_NetworkSinkV1BeforeFork) {
+		// Arrange: 205 * 0.2 = 41
+		auto options = CreateOptionsFromPercentages(0, 20);
+		options.HarvestNetworkFeeSinkAddress = model::HeightDependentAddress(test::GenerateRandomByteArray<Address>());
+		options.HarvestNetworkFeeSinkAddress.trySet(
+				ToAddress(options.HarvestNetworkFeeSinkPublicKey),
+				Observer_Context_Height + Height(1));
+
+		auto harvester = test::GenerateRandomByteArray<Key>();
+		auto beneficiary = test::GenerateRandomByteArray<Key>();
+		BalancesInfo finalBalances{ Amount(987 + 164), Amount(234), Amount(444 + 41) };
+
+		// Act + Assert:
+		AssertHarvesterSharesFees(harvester, beneficiary, options, Amount(205), finalBalances, {
+			{ harvester, Amount(164) }, { options.HarvestNetworkFeeSinkPublicKey, Amount(41) }
+		});
+	}
+
+	TEST(TEST_CLASS, HarvesterSharesFeesAccordingToGivenPercentage_NetworkSinkLatestAtFork) {
+		// Arrange: 205 * 0.2 = 41
+		auto options = CreateOptionsFromPercentages(0, 20);
+		options.HarvestNetworkFeeSinkAddress.trySet(test::GenerateRandomByteArray<Address>(), Observer_Context_Height);
+
+		auto harvester = test::GenerateRandomByteArray<Key>();
+		auto beneficiary = test::GenerateRandomByteArray<Key>();
+		BalancesInfo finalBalances{ Amount(987 + 164), Amount(234), Amount(444 + 41) };
+
+		// Act + Assert:
+		AssertHarvesterSharesFees(harvester, beneficiary, options, Amount(205), finalBalances, {
+			{ harvester, Amount(164) }, { options.HarvestNetworkFeeSinkPublicKey, Amount(41) }
+		});
+	}
+
+	// endregion
+
 	// region fee sharing - remote benficiary
 
 	namespace {
@@ -548,13 +590,13 @@ namespace catapult { namespace observers {
 			{ beneficiary, Amount(100 + static_cast<uint64_t>(12)) },
 			{ Key(), Amount(static_cast<uint64_t>(60)) }
 		});
-		EXPECT_EQ(std::get<0>(catapult::plugins::totalSupply.back()), 555);
-		EXPECT_EQ(std::get<1>(catapult::plugins::totalSupply.back()), 2102400060);
-		EXPECT_EQ(std::get<2>(catapult::plugins::totalSupply.back()), 60);
+		EXPECT_EQ(std::get<0>(catapult::plugins::totalSupply.back()), 555u);
+		EXPECT_EQ(std::get<1>(catapult::plugins::totalSupply.back()), 2102400060u);
+		EXPECT_EQ(std::get<2>(catapult::plugins::totalSupply.back()), 60u);
 		
-		EXPECT_EQ(std::get<0>(catapult::plugins::epochFees.back()), 555);
-		EXPECT_EQ(std::get<1>(catapult::plugins::epochFees.back()), 500);
-		EXPECT_EQ(std::get<2>(catapult::plugins::epochFees.back()), 500);
+		EXPECT_EQ(std::get<0>(catapult::plugins::epochFees.back()), 555u);
+		EXPECT_EQ(std::get<1>(catapult::plugins::epochFees.back()), 500u);
+		EXPECT_EQ(std::get<2>(catapult::plugins::epochFees.back()), 500u);
 	}
 
 	TEST(TEST_CLASS, HarvesterSharesInflationAccordingToGivenPercentage_Rollback) {
@@ -577,11 +619,11 @@ namespace catapult { namespace observers {
 		// Act + Assert:
 		AssertHarvesterSharesFees(NotifyMode::Rollback, harvester, beneficiary, options, Amount(500), calculator, finalBalances, {});
 		
-		EXPECT_EQ(std::get<0>(catapult::plugins::totalSupply.back()), 554);
-		EXPECT_EQ(std::get<1>(catapult::plugins::totalSupply.back()), 2102400000);
-		EXPECT_EQ(std::get<2>(catapult::plugins::totalSupply.back()), 2102400000);
+		EXPECT_EQ(std::get<0>(catapult::plugins::totalSupply.back()), 554u);
+		EXPECT_EQ(std::get<1>(catapult::plugins::totalSupply.back()), 2102400000u);
+		EXPECT_EQ(std::get<2>(catapult::plugins::totalSupply.back()), 2102400000u);
 		
-		EXPECT_EQ(catapult::plugins::epochFees.size(), 0);
+		EXPECT_EQ(catapult::plugins::epochFees.size(), 0u);
 	}
 
 	// endregion

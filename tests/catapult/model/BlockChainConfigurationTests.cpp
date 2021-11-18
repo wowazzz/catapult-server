@@ -35,7 +35,20 @@ namespace catapult { namespace model {
 	namespace {
 		constexpr auto Nemesis_Signer_Public_Key = "C738E237C98760FA72726BA13DC2A1E3C13FA67DE26AF09742E972EE4EE45E1C";
 		constexpr auto Nemesis_Generation_Hash_Seed = "CE076EF4ABFBC65B046987429E274EC31506D173E91BF102F16BEB7FB8176230";
-		constexpr auto Harvest_Network_Fee_Sink_Address = "SBHI5UVMDQ36X3USYK6UQELCLZ7YL3T2WP5OCKY";
+		constexpr auto Harvest_Network_Fee_Sink_Address_V1 = "TBTBPZBJV3U5PU6TNC6GOSB54E5IZA5KQ6KGJXY";
+		constexpr auto Harvest_Network_Fee_Sink_Address = "TCRRSPVMOOPX3QA2JRN432LFODY2KA4EJBEZUKQ";
+
+		constexpr auto Signature_1 =
+				"395C2B37C7AABBEC3C08BD42DAF52D93D1BF003FF6A731E54F63003383EF1CE0"
+				"302871ADD90DF04638DC617ACF2F5BB759C3DDC060E55A554477543210976C75";
+
+		constexpr auto Signature_2 =
+				"401ECCE607FF9710A00B677A487D36B9B9B3B0DC6DF59DA0A2BD77603E80B82B"
+				"D0A82FE949055C5BB7A00F83AF4FF1242965CBF62C9D083344FF294D157259B2";
+
+		constexpr auto Signature_3 =
+				"3A785A34EA7FAB8AD7ED1B95EC0C0C1CC4097104DD3A47AB06E138D59DC48D75"
+				"300996EDEF0C24641EE5EFFD83A3EFE10CE4CA41DAAF642342E988A0A0EA7FB6";
 
 		struct BlockChainConfigurationTraits {
 			using ConfigurationType = BlockChainConfiguration;
@@ -45,7 +58,7 @@ namespace catapult { namespace model {
 					{
 						"network",
 						{
-							{ "identifier", "public-test" },
+							{ "identifier", "testnet" },
 							{ "nodeEqualityStrategy", "host" },
 							{ "nemesisSignerPublicKey", Nemesis_Signer_Public_Key },
 							{ "generationHashSeed", Nemesis_Generation_Hash_Seed },
@@ -88,9 +101,25 @@ namespace catapult { namespace model {
 
 							{ "harvestBeneficiaryPercentage", "56" },
 							{ "harvestNetworkPercentage", "21" },
+							{ "harvestNetworkFeeSinkAddressV1", Harvest_Network_Fee_Sink_Address_V1 },
 							{ "harvestNetworkFeeSinkAddress", Harvest_Network_Fee_Sink_Address },
 
 							{ "maxTransactionsPerBlock", "120" }
+						}
+					},
+					{
+						"fork_heights",
+						{
+							{ "totalVotingBalanceCalculationFix", "998877" },
+							{ "treasuryReissuance", "11998877" }
+						}
+					},
+					{
+						"treasury_reissuance_transaction_signatures",
+						{
+							{ Signature_1, "true" },
+							{ Signature_2, "false" },
+							{ Signature_3, "true" }
 						}
 					},
 					{
@@ -154,16 +183,21 @@ namespace catapult { namespace model {
 
 				EXPECT_EQ(0u, config.HarvestBeneficiaryPercentage);
 				EXPECT_EQ(0u, config.HarvestNetworkPercentage);
+				EXPECT_EQ(Address(), config.HarvestNetworkFeeSinkAddressV1);
 				EXPECT_EQ(Address(), config.HarvestNetworkFeeSinkAddress);
 
 				EXPECT_EQ(0u, config.MaxTransactionsPerBlock);
 
+				EXPECT_EQ(Height(0), config.ForkHeights.TotalVotingBalanceCalculationFix);
+				EXPECT_EQ(Height(0), config.ForkHeights.TreasuryReissuance);
+
+				EXPECT_TRUE(config.TreasuryReissuanceTransactionSignatures.empty());
 				EXPECT_TRUE(config.Plugins.empty());
 			}
 
 			static void AssertCustom(const BlockChainConfiguration& config) {
 				// Assert: notice that ParseKey also works for Hash256 because it is the same type as Key
-				EXPECT_EQ(NetworkIdentifier::Public_Test, config.Network.Identifier);
+				EXPECT_EQ(NetworkIdentifier::Testnet, config.Network.Identifier);
 				EXPECT_EQ(NodeIdentityEqualityStrategy::Host, config.Network.NodeEqualityStrategy);
 				EXPECT_EQ(utils::ParseByteArray<Key>(Nemesis_Signer_Public_Key), config.Network.NemesisSignerPublicKey);
 				EXPECT_EQ(utils::ParseByteArray<GenerationHashSeed>(Nemesis_Generation_Hash_Seed), config.Network.GenerationHashSeed);
@@ -202,9 +236,20 @@ namespace catapult { namespace model {
 
 				EXPECT_EQ(56u, config.HarvestBeneficiaryPercentage);
 				EXPECT_EQ(21, config.HarvestNetworkPercentage);
+				EXPECT_EQ(StringToAddress(Harvest_Network_Fee_Sink_Address_V1), config.HarvestNetworkFeeSinkAddressV1);
 				EXPECT_EQ(StringToAddress(Harvest_Network_Fee_Sink_Address), config.HarvestNetworkFeeSinkAddress);
 
 				EXPECT_EQ(120u, config.MaxTransactionsPerBlock);
+
+				EXPECT_EQ(Height(998877), config.ForkHeights.TotalVotingBalanceCalculationFix);
+				EXPECT_EQ(Height(11998877), config.ForkHeights.TreasuryReissuance);
+
+				EXPECT_EQ(
+						std::vector<Signature>({
+							utils::ParseByteArray<Signature>(Signature_1),
+							utils::ParseByteArray<Signature>(Signature_3)
+						}),
+						config.TreasuryReissuanceTransactionSignatures);
 
 				EXPECT_EQ(2u, config.Plugins.size());
 				const auto& pluginAlphaBag = config.Plugins.find("alpha")->second;
@@ -294,6 +339,40 @@ namespace catapult { namespace model {
 
 		// Act + Assert:
 		EXPECT_EQ(UnresolvedMosaicId(1234), GetUnresolvedCurrencyMosaicId(config));
+	}
+
+	TEST(TEST_CLASS, CanGetHarvestNetworkFeeSinkAddressWithoutFork) {
+		// Arrange:
+		auto config = BlockChainConfiguration::Uninitialized();
+		config.HarvestNetworkFeeSinkAddressV1 = test::GenerateRandomByteArray<Address>();
+		config.HarvestNetworkFeeSinkAddress = test::GenerateRandomByteArray<Address>();
+		config.ForkHeights.TreasuryReissuance = Height();
+
+		// Act:
+		auto sinkAddress = GetHarvestNetworkFeeSinkAddress(config);
+
+		// Assert:
+		EXPECT_EQ(config.HarvestNetworkFeeSinkAddress, sinkAddress.get(Height(0)));
+		EXPECT_EQ(config.HarvestNetworkFeeSinkAddress, sinkAddress.get(Height(1)));
+	}
+
+	TEST(TEST_CLASS, CanGetHarvestNetworkFeeSinkAddressWithFork) {
+		// Arrange:
+		auto config = BlockChainConfiguration::Uninitialized();
+		config.HarvestNetworkFeeSinkAddressV1 = test::GenerateRandomByteArray<Address>();
+		config.HarvestNetworkFeeSinkAddress = test::GenerateRandomByteArray<Address>();
+		config.ForkHeights.TreasuryReissuance = Height(1234);
+
+		// Act:
+		auto sinkAddress = GetHarvestNetworkFeeSinkAddress(config);
+
+		// Assert:
+		EXPECT_EQ(config.HarvestNetworkFeeSinkAddress, sinkAddress.get(Height(0)));
+		EXPECT_EQ(config.HarvestNetworkFeeSinkAddressV1, sinkAddress.get(Height(1)));
+
+		EXPECT_EQ(config.HarvestNetworkFeeSinkAddressV1, sinkAddress.get(Height(1233)));
+		EXPECT_EQ(config.HarvestNetworkFeeSinkAddress, sinkAddress.get(Height(1234)));
+		EXPECT_EQ(config.HarvestNetworkFeeSinkAddress, sinkAddress.get(Height(1235)));
 	}
 
 	namespace {

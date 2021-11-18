@@ -42,9 +42,10 @@ namespace catapult { namespace harvesting {
 		constexpr auto Default_Time = Timestamp(987);
 		constexpr auto Default_Last_Recalculation_Height = model::ImportanceHeight(1234);
 
-		constexpr auto Network_Identifier = model::NetworkIdentifier::Private_Test;
+		constexpr auto Network_Identifier = model::NetworkIdentifier::Testnet;
 		constexpr auto Currency_Mosaic_Id = MosaicId(1234);
 		constexpr auto Harvesting_Mosaic_Id = MosaicId(9876);
+		constexpr auto Fork_Height = Height(1000);
 
 		// endregion
 
@@ -64,9 +65,11 @@ namespace catapult { namespace harvesting {
 			config.CurrencyMosaicId = Currency_Mosaic_Id;
 			config.HarvestingMosaicId = Harvesting_Mosaic_Id;
 			config.ImportanceGrouping = 4;
+			config.VotingSetGrouping = 25;
 			config.MaxTransactionLifetime = utils::TimeSpan::FromHours(24);
 			config.MinHarvesterBalance = Amount(1000);
 			config.MinVoterBalance = Amount(2000);
+			config.ForkHeights.TotalVotingBalanceCalculationFix = Fork_Height;
 			return config;
 		}
 
@@ -84,6 +87,18 @@ namespace catapult { namespace harvesting {
 			return Hash256();
 		}
 
+		void AssertDependentBlockHeights(const test::MockNotificationPublisher& publisher) {
+			auto i = 0u;
+			for (const auto& param : publisher.params()) {
+				if (model::BasicEntityType::Transaction == model::ToBasicEntityType(param.EntityType))
+					EXPECT_EQ(Default_Height + Height(1), param.BlockHeight) << "published entity at " << i;
+				else
+					EXPECT_EQ(Height(), param.BlockHeight) << "published entity at " << i;
+
+				++i;
+			}
+		}
+
 		template<typename TAction>
 		void RunUtFacadeTest(TAction action) {
 			// Arrange: create factory and facade
@@ -98,6 +113,7 @@ namespace catapult { namespace harvesting {
 
 			// Act + Assert:
 			action(*pFacade, executionConfig);
+			AssertDependentBlockHeights(*executionConfig.pNotificationPublisher);
 		}
 
 		template<typename TAction>
@@ -121,6 +137,7 @@ namespace catapult { namespace harvesting {
 
 			// Act + Assert:
 			action(*pFacade, transactionInfos, executionConfig);
+			AssertDependentBlockHeights(*executionConfig.pNotificationPublisher);
 		}
 
 		void AssertEmpty(const HarvestingUtFacade& facade) {
@@ -436,8 +453,8 @@ namespace catapult { namespace harvesting {
 
 				accountState.SupplementalPublicKeys.voting().add({
 					votingKeyPairs[i].publicKey().copyTo<VotingKey>(),
-					FinalizationEpoch(1),
-					FinalizationEpoch(100)
+					FinalizationEpoch((i + 1) * 10),
+					FinalizationEpoch((i + 6) * 10)
 				});
 			}
 
@@ -445,9 +462,12 @@ namespace catapult { namespace harvesting {
 			return signingKeyPairs;
 		}
 
-		auto RunCommitSetsImportanceHeaderFields(const model::BlockChainConfiguration& config, const std::vector<Amount>& balances) {
+		auto RunCommitSetsImportanceHeaderFields(
+				Height blockHeight,
+				const model::BlockChainConfiguration& config,
+				const std::vector<Amount>& balances) {
 			// Arrange:
-			auto importanceMultipleHeight = model::CalculateGroupedHeight<Height>(Default_Height, config.ImportanceGrouping);
+			auto importanceMultipleHeight = model::CalculateGroupedHeight<Height>(blockHeight, config.ImportanceGrouping);
 			auto catapultCache = test::CreateEmptyCatapultCache(config);
 			{
 				auto cacheDelta = catapultCache.createDelta();
@@ -468,15 +488,34 @@ namespace catapult { namespace harvesting {
 		}
 	}
 
-	TEST(TEST_CLASS, CommitSetsImportanceHeaderFields_AllHarvesters) {
-		// Arrange: 10 accounts, only 5 of them are voting accounts
+	TEST(TEST_CLASS, CommitSetsImportanceHeaderFields_SomeHarvesters_BeforeFork) {
+		// Arrange: 1985, 1990, 1995, | 2000 | 2005, 2010, 2015
+		auto config = CreateBlockChainConfiguration();
+		config.MinHarvesterBalance = Amount(2000);
+		config.MinVoterBalance = Amount(2005);
+		auto harvestingBalances = CreateBalances(Amount(1985), 7);
+
+		// Act:
+		auto pBlock = RunCommitSetsImportanceHeaderFields(Default_Height, config, harvestingBalances);
+
+		// Assert: total amount = 2005 + 2010 + 2015
+		const auto& blockFooter = model::GetBlockFooter<model::ImportanceBlockFooter>(*pBlock);
+		EXPECT_EQ(Height(16), pBlock->Height);
+		EXPECT_EQ(3u, blockFooter.VotingEligibleAccountsCount);
+		EXPECT_EQ(Amount(6030), blockFooter.TotalVotingBalance);
+		EXPECT_EQ(4u, blockFooter.HarvestingEligibleAccountsCount);
+		EXPECT_EQ(Hash256({ 24 }), blockFooter.PreviousImportanceBlockHash);
+	}
+
+	TEST(TEST_CLASS, CommitSetsImportanceHeaderFields_AllHarvesters_BeforeFork) {
+		// Arrange: | 1985, 1990, 1995 | 2000, 2005, 2010, 2015
 		auto config = CreateBlockChainConfiguration();
 		config.MinHarvesterBalance = Amount(1000);
 		config.MinVoterBalance = Amount(2000);
 		auto harvestingBalances = CreateBalances(Amount(1985), 7);
 
 		// Act:
-		auto pBlock = RunCommitSetsImportanceHeaderFields(config, harvestingBalances);
+		auto pBlock = RunCommitSetsImportanceHeaderFields(Default_Height, config, harvestingBalances);
 
 		// Assert: total amount = 2000 + 2005 + 2010 + 2015
 		const auto& blockFooter = model::GetBlockFooter<model::ImportanceBlockFooter>(*pBlock);
@@ -487,24 +526,49 @@ namespace catapult { namespace harvesting {
 		EXPECT_EQ(Hash256({ 24 }), blockFooter.PreviousImportanceBlockHash);
 	}
 
-	TEST(TEST_CLASS, CommitSetsImportanceHeaderFields_SomeHarvesters) {
-		// Arrange:
+	TEST(TEST_CLASS, CommitSetsImportanceHeaderFields_AllHarvesters_AtFork) {
+		// Arrange: | 1985, 1990, 1995 | 2000, 2005, 2010, 2015
+		// epoch 41:    *     *    *      *
 		auto config = CreateBlockChainConfiguration();
-		config.MinHarvesterBalance = Amount(2000);
-		config.MinVoterBalance = Amount(2005);
+		config.MinHarvesterBalance = Amount(1000);
+		config.MinVoterBalance = Amount(2000);
 		auto harvestingBalances = CreateBalances(Amount(1985), 7);
 
 		// Act:
-		auto pBlock = RunCommitSetsImportanceHeaderFields(config, harvestingBalances);
+		auto pBlock = RunCommitSetsImportanceHeaderFields(Fork_Height + Height(1), config, harvestingBalances);
 
-		// Assert: total amount = 2005 + 2010 + 2015
+		// Assert: total amount = 2000
 		const auto& blockFooter = model::GetBlockFooter<model::ImportanceBlockFooter>(*pBlock);
-		EXPECT_EQ(Height(16), pBlock->Height);
-		EXPECT_EQ(3u, blockFooter.VotingEligibleAccountsCount);
-		EXPECT_EQ(Amount(6030), blockFooter.TotalVotingBalance);
-		EXPECT_EQ(4u, blockFooter.HarvestingEligibleAccountsCount);
-		EXPECT_EQ(Hash256({ 24 }), blockFooter.PreviousImportanceBlockHash);
+		EXPECT_EQ(Fork_Height, pBlock->Height);
+		EXPECT_EQ(1u, blockFooter.VotingEligibleAccountsCount);
+		EXPECT_EQ(Amount(2000), blockFooter.TotalVotingBalance);
+		EXPECT_EQ(7u, blockFooter.HarvestingEligibleAccountsCount);
+		EXPECT_EQ(Hash256({ 0xC8 }), blockFooter.PreviousImportanceBlockHash);
 	}
+
+	TEST(TEST_CLASS, CommitSetsImportanceHeaderFields_AllHarvesters_AfterFork) {
+		// Arrange: | 1985, 1990, 1995 | 2000, 2005, 2010, 2015
+		// epoch 51:    *    *      *      *     *
+		auto config = CreateBlockChainConfiguration();
+		config.MinHarvesterBalance = Amount(1000);
+		config.MinVoterBalance = Amount(2000);
+		auto harvestingBalances = CreateBalances(Amount(1985), 7);
+
+		// Act:
+		auto pBlock = RunCommitSetsImportanceHeaderFields(Fork_Height + Height(249), config, harvestingBalances);
+
+		// Assert: total amount = 2000 + 2005
+		const auto& blockFooter = model::GetBlockFooter<model::ImportanceBlockFooter>(*pBlock);
+		EXPECT_EQ(Fork_Height + Height(248), pBlock->Height);
+		EXPECT_EQ(2u, blockFooter.VotingEligibleAccountsCount);
+		EXPECT_EQ(Amount(4005), blockFooter.TotalVotingBalance);
+		EXPECT_EQ(7u, blockFooter.HarvestingEligibleAccountsCount);
+		EXPECT_EQ(Hash256({ 0xB8 }), blockFooter.PreviousImportanceBlockHash);
+	}
+
+	// endregion
+
+	// region commit - high value accounts update
 
 	namespace {
 		void Transfer(state::AccountState& debitState, state::AccountState& creditState, MosaicId mosaicId, Amount amount) {
@@ -524,8 +588,8 @@ namespace catapult { namespace harvesting {
 		private:
 			void notify(const model::BalanceTransferNotification& notification, observers::ObserverContext& context) const {
 				auto& accountStateCacheDelta = context.Cache.sub<cache::AccountStateCache>();
-				auto senderIter = accountStateCacheDelta.find(notification.Sender);
-				auto recipientIter = accountStateCacheDelta.find(context.Resolvers.resolve(notification.Recipient));
+				auto senderIter = accountStateCacheDelta.find(notification.Sender.resolved(context.Resolvers));
+				auto recipientIter = accountStateCacheDelta.find(notification.Recipient.resolved(context.Resolvers));
 
 				auto& senderState = senderIter.get();
 				auto& recipientState = recipientIter.get();
@@ -586,7 +650,8 @@ namespace catapult { namespace harvesting {
 		// Sanity:
 		{
 			auto view = catapultCache.createView();
-			auto statistics = cache::ReadOnlyAccountStateCache(view.sub<cache::AccountStateCache>()).highValueAccountStatistics();
+			const auto& accountStateCache = view.sub<cache::AccountStateCache>();
+			auto statistics = cache::ReadOnlyAccountStateCache(accountStateCache).highValueAccountStatistics(FinalizationEpoch(0));
 			EXPECT_EQ(3u, statistics.VotingEligibleAccountsCount);
 		}
 
@@ -626,6 +691,7 @@ namespace catapult { namespace harvesting {
 			auto pBlockHeader = std::make_unique<model::BlockHeader>();
 			test::FillWithRandomData({ reinterpret_cast<uint8_t*>(pBlockHeader.get()), sizeof(model::BlockHeader) });
 			pBlockHeader->Size = sizeof(model::BlockHeader) + sizeof(model::PaddedBlockFooter);
+			pBlockHeader->Type = model::Entity_Type_Block_Normal;
 			pBlockHeader->Height = height;
 			pBlockHeader->FeeMultiplier = BlockFeeMultiplier();
 			pBlockHeader->ReceiptsHash = Hash256();

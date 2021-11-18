@@ -25,11 +25,8 @@
 namespace catapult { namespace model {
 
 	namespace {
-		VotingKey Find(const std::vector<PinnedVotingKey>& pinnedPublicKeys, FinalizationEpoch epoch) {
-			auto iter = std::find_if(pinnedPublicKeys.cbegin(), pinnedPublicKeys.cend(), [epoch](const auto& pinnedPublicKey) {
-				return pinnedPublicKey.StartEpoch <= epoch && epoch <= pinnedPublicKey.EndEpoch;
-			});
-			return pinnedPublicKeys.cend() != iter ? iter->VotingKey : VotingKey();
+		bool Contains(const AddressSet& addresses, const Address& address) {
+			return addresses.cend() != addresses.find(address);
 		}
 	}
 
@@ -50,10 +47,22 @@ namespace catapult { namespace model {
 			if (Amount() == balance)
 				continue;
 
+			auto effectiveVotingPublicKey = FindVotingPublicKeyForEpoch(accountHistory.votingPublicKeys().get(m_height), m_epoch);
+			if (VotingKey() == effectiveVotingPublicKey)
+				continue;
+
+			const auto& address = accountHistoryPair.first;
+			if (config.TreasuryReissuanceEpoch <= epoch && Contains(config.TreasuryReissuanceEpochIneligibleVoterAddresses, address)) {
+				CATAPULT_LOG(info)
+						<< "excluding voting account " << address
+						<< " from voting set at epoch " << config.TreasuryReissuanceEpoch;
+				continue;
+			}
+
 			auto accountView = FinalizationAccountView();
 			accountView.Weight = balance;
 
-			m_accounts.emplace(Find(accountHistory.votingPublicKeys().get(m_height), m_epoch), accountView);
+			m_accounts.emplace(effectiveVotingPublicKey, accountView);
 			m_weight = m_weight + balance;
 		}
 	}

@@ -1,22 +1,22 @@
 # Running a Private Network on Ubuntu 18.04 (LTS)
 
-The instructions below describe the minimum amount of changes to run a network from the catapult-server build.
+The instructions below describe the minimum amount of changes to run a network from the catapult-client build.
 
-NOTE: Replace ``private-test`` occurrences with the network type selected.
-The possible network values are: ``private``, ``private-test``, ``public`` and ``public-test``.
+NOTE: Replace ``testnet`` occurrences with the network type selected.
+The possible network values are: ``mainnet``, ``testnet`` or a custom one byte value.
 
 ## Prerequisites
 
-* Have built catapult-server following either [Conan](BUILD-conan.md) or [manual](BUILD-manual.md) instructions.
+* Have built catapult-client following either [Conan](BUILD-conan.md) or [manual](BUILD-manual.md) instructions.
 
 ## Copy the configuration template
 
-After building catapult-server, copy the configuration templates from the root folder of the repository under the ``_build`` directory.
+After building catapult-client, copy the configuration templates from the root folder of the repository under the ``_build`` directory.
 
 ```sh
-cd catapult-server/_build
+cd catapult-client/_build
 cp ../resources/* resources/
-cp ../tools/nemgen/resources/private-test.properties resources/
+cp ../tools/nemgen/resources/testnet.properties resources/
 ```
 
 > **WARNING:**
@@ -27,7 +27,7 @@ cp ../tools/nemgen/resources/private-test.properties resources/
 Generate a set of accounts. The accounts stored in the file ``nemesis.addresses.txt`` will be used at a later step to receive the network's currency and harvest mosaics on the first block.
 
 ```sh
-./bin/catapult.tools.addressgen --count 10 --network private-test --output nemesis.addresses.txt --suppressConsole
+./bin/catapult.tools.addressgen --count 10 --network testnet --output nemesis.addresses.txt --suppressConsole
 cat nemesis.addresses.txt
 ```
 
@@ -35,7 +35,7 @@ The script generates ten accounts for the nemesis block, but the number of accou
 
 ## Create the seed and transactions directory
 
-1. Create a directory to save the generated nemesis block under ``catapult-server/_build``.
+1. Create a directory to save the generated nemesis block under ``catapult-client/_build``.
 
     ```sh
     mkdir -p seed/00000
@@ -49,19 +49,19 @@ The script generates ten accounts for the nemesis block, but the number of accou
 
 ## Edit the nemesis block
 
-catapult-server calls the first block in the chain the nemesis block.
+catapult-client calls the first block in the chain the nemesis block.
 The first block is defined before launching a new network and sets the initial distribution of mosaics.
 
-The file ``resources/private-test.properties`` defines the transactions issued in the nemesis block.
+The file ``resources/testnet.properties`` defines the transactions issued in the nemesis block.
 
-1. Open ``private-test.properties`` and edit the ``[nemesis]`` section.
+1. Open ``testnet.properties`` and edit the ``[nemesis]`` section.
 Replace ``nemesisGenerationHashSeed`` with a unique SHA3-256 hash that will identify the network
 and ``nemesisSignerPrivateKey`` with a private key from ``nemesis.addresses.txt``.
 
     ```ini
     [nemesis]
 
-    networkIdentifier = private-test
+    networkIdentifier = testnet
     nemesisGenerationHashSeed = 57F7DA205008026C776CB6AED843393F04CD458E0AA2D9F1D5F31A402072B2D6
     nemesisSignerPrivateKey = ●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●
     ```
@@ -119,25 +119,25 @@ Replace at least one address in each list with an address from ``nemesis.address
 ## Edit the network properties
 
 The file ``resources/config-network.properties`` defines the network configuration.
-Learn more about each network property in [this guide](https://nemtech.github.io/guides/network/configuring-network-properties.html#properties).
+Learn more about each network property in [this guide](https://symbol.github.io/guides/network/configuring-network-properties.html#properties).
 
 Edit the properties file to match the nemesis block with the desired network configuration. Important properties to check are:
 
-* ``initialCurrencyAtomicUnits``: Initial currency units available in the network, as specified in the ``supply`` property in the ``[mosaic>cat:currency]`` in ``private-test.properties``.
+* ``initialCurrencyAtomicUnits``: Initial currency units available in the network, as specified in the ``supply`` property in the ``[mosaic>cat:currency]`` in ``testnet.properties``.
 * ``totalChainImportance``: Total importance units available in the network.
-  * The sum of all mosaics distributed in the ``distribution>cat:harvest`` section in ``private-test.properties`` must be divisible by this number.
+  * The sum of all mosaics distributed in the ``distribution>cat:harvest`` section in ``testnet.properties`` must be divisible by this number.
   * The result of the division must be a non-negative power of ten.
   * For example, if 500 mosaics have been distributed by the nemesis block, ``totalChainImportance`` could be 500, 50 or 5.
-* ``identifier``: Network identifier, must be one of ``private``, ``private-test``, ``public`` or ``public-test``.
-* ``nemesisSignerPublicKey``: The public key corresponding to the ``nemesisSignerPrivateKey`` used in ``private-test.properties``.
-* ``generationHashSeed``: The same value used as ``nemesisGenerationHashSeed`` in ``private-test.properties``.
+* ``identifier``: Network identifier, must a named network (``mainnet``, ``testnet``) or a one byte value.
+* ``nemesisSignerPublicKey``: The public key corresponding to the ``nemesisSignerPrivateKey`` used in ``testnet.properties``.
+* ``generationHashSeed``: The same value used as ``nemesisGenerationHashSeed`` in ``testnet.properties``.
 * ``harvestNetworkFeeSinkAddress``: Address of the harvest network fee sink account.
 * ``mosaicRentalFeeSinkAddress``: Address of the mosaic rental fee sink account.
 * ``namespaceRentalFeeSinkAddress``: Address of the namespace rental fee sink account.
 
 ## Append the VRF Keys to the nemesis block
 
-The process of creating new blocks is called [harvesting](https://nemtech.github.io/concepts/harvesting.html).
+The process of creating new blocks is called [harvesting](https://symbol.github.io/concepts/harvesting.html).
 Each node of the network can host zero or more harvester accounts to create new blocks and get rewarded.
 
 In order to be an eligible harvester, the account must:
@@ -157,7 +157,7 @@ In order to be an eligible harvester, the account must:
     ./catapult.tools.linker --resources ../ --type vrf --secret <HARVESTER_PRIVATE_KEY> --linkedPublicKey <VRF_PUBLIC_KEY> --output ../txes/vrf_tx0.bin
     ```
 
-   * Replace ``<HARVESTER_PRIVATE_KEY>`` with the private key of an account that owns sufficient harvesting mosaics in ``resources/private-test.properties`` ``[distribution>cat:harvest]``.
+   * Replace ``<HARVESTER_PRIVATE_KEY>`` with the private key of an account that owns sufficient harvesting mosaics in ``resources/testnet.properties`` ``[distribution>cat:harvest]``.
 
    * Replace ``<VRF_PUBLIC_KEY>`` with the public key of an unused account from ``nemesis.addresses.txt``.
 
@@ -194,12 +194,12 @@ Each node of the network can optionally host a voting account (to partake in the
 
 ## Generate the network mosaic ids
 
-The network mosaic ids are autogenerated based on the configuration provided in the file ``resources/private-test.properties``.
+The network mosaic ids are autogenerated based on the configuration provided in the file ``resources/testnet.properties``.
 
 1. Run the nemesis block generator.
 
     ```sh
-    ./catapult.tools.nemgen --nemesisProperties ../resources/private-test.properties
+    ./catapult.tools.nemgen --nemesisProperties ../resources/testnet.properties
     ```
 
     **It will error out** because the mosaic ids currently in ``config-network.properties`` do not match the calculated values. Do not worry, we are going to fix that now.
@@ -227,7 +227,7 @@ The network mosaic ids are autogenerated based on the configuration provided in 
 Run the nemesis block generator a second time, this time with the correct mosaic ids values.
 
 ```sh
-./catapult.tools.nemgen --nemesisProperties ../resources/private-test.properties
+./catapult.tools.nemgen --nemesisProperties ../resources/testnet.properties
 ```
 
 ## Configure the node

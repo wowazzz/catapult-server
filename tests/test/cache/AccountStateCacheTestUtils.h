@@ -30,7 +30,7 @@ namespace catapult { namespace test {
 			MosaicId currencyMosaicId,
 			MosaicId harvestingMosaicId) {
 		return {
-			model::NetworkIdentifier::Private_Test,
+			model::NetworkIdentifier::Testnet,
 			333,
 			222,
 			Amount(),
@@ -57,6 +57,13 @@ namespace catapult { namespace test {
 
 	/// Adds random accounts to \a delta with specified \a balances of \a mosaicId.
 	std::vector<Address> AddAccountsWithBalances(
+			cache::AccountStateCacheDelta& delta,
+			MosaicId mosaicId,
+			const std::vector<Amount>& balances);
+
+	/// Adds random accounts to \a delta with specified \a balances of \a mosaicId and overlapping voting key lifetimes.
+	/// \note Accounts will have voting key lifetimes of [(10, 60), (20, 70) ...]
+	std::vector<Address> AddAccountsWithBalancesAndOverlappingVotingKeyLifetimes(
 			cache::AccountStateCacheDelta& delta,
 			MosaicId mosaicId,
 			const std::vector<Amount>& balances);

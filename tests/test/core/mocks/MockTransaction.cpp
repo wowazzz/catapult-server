@@ -46,6 +46,48 @@ namespace catapult { namespace mocks {
 		return GetRecipientAddressT(transaction);
 	}
 
+	std::vector<model::NotificationType> GetExpectedMockTransactionObserverNotificationTypes() {
+		return {
+			// basic transaction notifications
+			model::Core_Source_Change_Notification,
+			model::Core_Register_Account_Public_Key_Notification,
+			model::Core_Transaction_Notification,
+			model::Core_Transaction_Fee_Notification,
+
+			// mock transaction notifications
+			model::Core_Register_Account_Public_Key_Notification,
+			mocks::Mock_Observer_1_Notification,
+			mocks::Mock_All_1_Notification,
+			mocks::Mock_Observer_2_Notification,
+			mocks::Mock_All_2_Notification,
+
+			// basic transaction notifications
+			model::Core_Balance_Debit_Notification
+		};
+	}
+
+	std::vector<model::NotificationType> GetExpectedMockTransactionValidatorNotificationTypes() {
+		return {
+			// basic transaction notifications
+			model::Core_Register_Account_Public_Key_Notification,
+			model::Core_Entity_Notification,
+			model::Core_Transaction_Notification,
+			model::Core_Transaction_Deadline_Notification,
+			model::Core_Transaction_Fee_Notification,
+
+			// mock transaction notifications
+			model::Core_Register_Account_Public_Key_Notification,
+			mocks::Mock_Validator_1_Notification,
+			mocks::Mock_All_1_Notification,
+			mocks::Mock_Validator_2_Notification,
+			mocks::Mock_All_2_Notification,
+
+			// basic transaction notifications
+			model::Core_Balance_Debit_Notification,
+			model::Core_Signature_Notification
+		};
+	}
+
 	namespace {
 		template<typename TMockTransaction>
 		std::unique_ptr<TMockTransaction> CreateMockTransactionT(uint16_t dataSize) {
@@ -87,7 +129,7 @@ namespace catapult { namespace mocks {
 		pTransaction->SignerPublicKey = signer;
 		pTransaction->RecipientPublicKey = recipient;
 		pTransaction->Version = 1;
-		pTransaction->Network = NetworkIdentifier::Private_Test;
+		pTransaction->Network = NetworkIdentifier::Testnet;
 		return pTransaction;
 	}
 
@@ -107,7 +149,7 @@ namespace catapult { namespace mocks {
 				PluginOptionFlags options,
 				NotificationSubscriber& sub) {
 			sub.notify(AccountPublicKeyNotification(mockTransaction.RecipientPublicKey));
-			sub.notify(MockAddressNotification(context.SignerAddress));
+			sub.notify(MockPublisherContextNotification(context.SignerAddress, context.BlockHeight));
 
 			if (IsPluginOptionFlagSet(options, PluginOptionFlags::Publish_Custom_Notifications)) {
 				sub.notify(test::CreateNotification(Mock_Observer_1_Notification));

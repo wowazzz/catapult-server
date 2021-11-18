@@ -28,6 +28,7 @@
 #include "catapult/model/BlockChainConfiguration.h"
 #include "catapult/model/BlockUtils.h"
 #include "catapult/model/FeeUtils.h"
+#include "catapult/model/VotingSet.h"
 #include "catapult/observers/DemuxObserverBuilder.h"
 
 namespace catapult { namespace harvesting {
@@ -136,7 +137,10 @@ namespace catapult { namespace harvesting {
 		bool apply(const model::TransactionInfo& transactionInfo) {
 			auto originalSource = m_blockStatementBuilder.source();
 
-			if (apply(model::WeakEntityInfo(*transactionInfo.pEntity, transactionInfo.EntityHash)))
+			model::BlockHeader blockHeader;
+			setBlockHeaderFieldsForApply(blockHeader);
+
+			if (apply(model::WeakEntityInfo(*transactionInfo.pEntity, transactionInfo.EntityHash, blockHeader)))
 				return true;
 
 			auto finalSource = m_blockStatementBuilder.source();
@@ -147,7 +151,10 @@ namespace catapult { namespace harvesting {
 		}
 
 		void unapply(const model::TransactionInfo& transactionInfo) {
-			unapply(model::WeakEntityInfo(*transactionInfo.pEntity, transactionInfo.EntityHash));
+			model::BlockHeader blockHeader;
+			setBlockHeaderFieldsForApply(blockHeader);
+
+			unapply(model::WeakEntityInfo(*transactionInfo.pEntity, transactionInfo.EntityHash, blockHeader));
 			m_blockStatementBuilder.popSource();
 		}
 
@@ -180,7 +187,11 @@ namespace catapult { namespace harvesting {
 			if (model::IsImportanceBlock(pBlock->Type)) {
 				accountStateCacheDelta.updateHighValueAccounts(pBlock->Height);
 
-				auto statistics = cache::ReadOnlyAccountStateCache(accountStateCacheDelta).highValueAccountStatistics();
+				auto epoch = pBlock->Height < m_blockChainConfig.ForkHeights.TotalVotingBalanceCalculationFix
+						? FinalizationEpoch(0)
+						: model::CalculateFinalizationEpochForHeight(pBlock->Height, m_blockChainConfig.VotingSetGrouping);
+
+				auto statistics = cache::ReadOnlyAccountStateCache(accountStateCacheDelta).highValueAccountStatistics(epoch);
 				auto& blockFooter = model::GetBlockFooter<model::ImportanceBlockFooter>(*pBlock);
 				blockFooter.VotingEligibleAccountsCount = statistics.VotingEligibleAccountsCount;
 				blockFooter.HarvestingEligibleAccountsCount = statistics.HarvestingEligibleAccountsCount;
@@ -210,6 +221,13 @@ namespace catapult { namespace harvesting {
 		}
 
 	private:
+		void setBlockHeaderFieldsForApply(model::BlockHeader& blockHeader) const {
+			blockHeader.Height = height();
+
+			// indicate transaction MaxFee should be used (this works because the associated block header is not validated)
+			blockHeader.VerifiableEntityHeader_Reserved1 = 1;
+		}
+
 		using Processor = predicate<
 			const validators::stateful::NotificationValidator&,
 			const validators::ValidatorContext&,

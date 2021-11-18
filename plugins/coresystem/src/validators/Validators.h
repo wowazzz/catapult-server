@@ -49,8 +49,11 @@ namespace catapult { namespace validators {
 	// region VerifiableEntity
 
 	/// Validator that applies to all signature notifications and validates that:
-	/// - nemesis account signatures are not allowed after the nemesis block
-	DECLARE_STATEFUL_VALIDATOR(NemesisSink, model::SignatureNotification)();
+	/// - nemesis account signatures are not allowed after the nemesis block unless they are in
+	///   \a additionalAllowedSignatures at \a additionalAllowedSignaturesHeight.
+	DECLARE_STATEFUL_VALIDATOR(NemesisSink, model::SignatureNotification)(
+			Height additionalAllowedSignaturesHeight,
+			const std::vector<Signature>& additionalAllowedSignatures);
 
 	/// Validator that applies to all entity notifications and validates that:
 	/// - the entity targets the expected network (\a networkIdentifier)
@@ -78,7 +81,11 @@ namespace catapult { namespace validators {
 
 	/// Validator that applies to all importance block notifications and validates that:
 	/// - notification values match calculated values (excluding PreviousImportanceBlockHash, which is validated separately)
-	DECLARE_STATEFUL_VALIDATOR(ImportanceBlock, model::ImportanceBlockNotification)();
+	/// - voting statistics are calculated more accurately for blocks at and after \a totalVotingBalanceCalculationFixForkHeight
+	/// - specifed voting set grouping (\a votingSetGrouping) is used to convert heights to epochs
+	DECLARE_STATEFUL_VALIDATOR(ImportanceBlock, model::ImportanceBlockNotification)(
+			Height totalVotingBalanceCalculationFixForkHeight,
+			uint64_t votingSetGrouping);
 
 	// endregion
 

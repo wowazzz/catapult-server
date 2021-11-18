@@ -50,7 +50,7 @@ namespace catapult { namespace config {
 
 		void AssertDefaultBlockChainConfiguration(const model::BlockChainConfiguration& config) {
 			// Assert:
-			EXPECT_EQ(model::NetworkIdentifier::Private_Test, config.Network.Identifier);
+			EXPECT_EQ(model::NetworkIdentifier::Testnet, config.Network.Identifier);
 			EXPECT_EQ(model::NodeIdentityEqualityStrategy::Host, config.Network.NodeEqualityStrategy);
 			EXPECT_EQ(
 					utils::ParseByteArray<Key>("C67F465087EF681824805B7E9FF3B2728A4EE847DE044DE5D9FA415F7660B08E"),
@@ -92,10 +92,15 @@ namespace catapult { namespace config {
 
 			EXPECT_EQ(10u, config.HarvestBeneficiaryPercentage);
 			EXPECT_EQ(5u, config.HarvestNetworkPercentage);
-			EXPECT_EQ(model::StringToAddress("VAHAR2IN62JRLNI4E3NYOA5XOGFCW644QSDPCOQ"), config.HarvestNetworkFeeSinkAddress);
+			EXPECT_EQ(model::StringToAddress("TCNKYBPT77IODEBW55PJMMVE3TEH3W73TCLRVXA"), config.HarvestNetworkFeeSinkAddressV1);
+			EXPECT_EQ(model::StringToAddress("TBRZAOZWIUL5OJPUPH4MQDJAEBXKENDIUFKI2YY"), config.HarvestNetworkFeeSinkAddress);
 
 			EXPECT_EQ(200'000u, config.MaxTransactionsPerBlock);
 
+			EXPECT_EQ(Height(528'000), config.ForkHeights.TotalVotingBalanceCalculationFix);
+			EXPECT_EQ(Height(600'000), config.ForkHeights.TreasuryReissuance);
+
+			EXPECT_TRUE(config.TreasuryReissuanceTransactionSignatures.empty());
 			EXPECT_FALSE(config.Plugins.empty());
 		}
 
@@ -344,7 +349,7 @@ namespace catapult { namespace config {
 
 		auto CreateCatapultConfiguration() {
 			test::MutableCatapultConfiguration config;
-			config.BlockChain.Network.Identifier = model::NetworkIdentifier::Private_Test;
+			config.BlockChain.Network.Identifier = model::NetworkIdentifier::Testnet;
 			config.BlockChain.Network.GenerationHashSeed = utils::ParseByteArray<GenerationHashSeed>(Generation_Hash_Seed_String);
 
 			config.Node.Port = 9876;
@@ -377,7 +382,7 @@ namespace catapult { namespace config {
 		EXPECT_EQ(9876u, endpoint.Port);
 
 		const auto& metadata = node.metadata();
-		EXPECT_EQ(model::NetworkIdentifier::Private_Test, metadata.NetworkFingerprint.Identifier);
+		EXPECT_EQ(model::NetworkIdentifier::Testnet, metadata.NetworkFingerprint.Identifier);
 		EXPECT_EQ(utils::ParseByteArray<GenerationHashSeed>(Generation_Hash_Seed_String), metadata.NetworkFingerprint.GenerationHashSeed);
 		EXPECT_EQ("a GREAT node", metadata.Name);
 		EXPECT_EQ(ionet::NodeVersion(123), metadata.Version);

@@ -20,26 +20,15 @@
 **/
 
 #pragma once
-#include <stdint.h>
+#include "catapult/plugins.h"
+#include "catapult/types.h"
+#include <memory>
 
-namespace catapult { namespace utils { class ConfigurationBag; } }
+namespace catapult { namespace model { class TransactionPlugin; } }
 
-namespace catapult { namespace config {
+namespace catapult { namespace plugins {
 
-	/// Price plugin configuration settings.
-	struct PriceConfiguration {
-	public:
-		/// Maximum transaction message size.
-		uint16_t MaxMessageSize;
-
-	private:
-		PriceConfiguration() = default;
-
-	public:
-		/// Creates an uninitialized price configuration.
-		static PriceConfiguration Uninitialized();
-
-		/// Loads a price configuration from \a bag.
-		static PriceConfiguration LoadFromBag(const utils::ConfigurationBag& bag);
-	};
+	/// Creates a mosaic supply revocation transaction plugin given the nemesis address (\a nemesisAddress).
+	PLUGIN_API
+	std::unique_ptr<model::TransactionPlugin> CreateMosaicSupplyRevocationTransactionPlugin(const Address& nemesisAddress);
 }}

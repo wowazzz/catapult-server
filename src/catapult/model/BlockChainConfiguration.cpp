@@ -23,6 +23,7 @@
 #include "Address.h"
 #include "catapult/utils/ConfigurationBag.h"
 #include "catapult/utils/ConfigurationUtils.h"
+#include "catapult/utils/HexParser.h"
 
 DEFINE_ADDRESS_CONFIGURATION_VALUE_SUPPORT
 
@@ -34,6 +35,40 @@ namespace catapult { namespace model {
 		void CheckPluginName(const std::string& pluginName) {
 			if (std::any_of(pluginName.cbegin(), pluginName.cend(), [](auto ch) { return (ch < 'a' || ch > 'z') && '.' != ch; }))
 				CATAPULT_THROW_INVALID_ARGUMENT_1("plugin name contains unexpected character", pluginName);
+		}
+
+		bool TryParseSignature(const std::string& str, Signature& signature) {
+			return utils::TryParseHexStringIntoContainer(str.data(), str.size(), signature);
+		}
+
+		size_t ParseSignaturesSection(const utils::ConfigurationBag& bag, std::vector<Signature>& signatures) {
+			auto sectionName = "treasury_reissuance_transaction_signatures";
+			auto signaturesPair = utils::ExtractSectionKeysAsTypedVector<Signature>(bag, sectionName, TryParseSignature);
+			signatures = std::move(signaturesPair.first);
+			return signaturesPair.second;
+		}
+
+		size_t ParsePluginSections(const utils::ConfigurationBag& bag, std::unordered_map<std::string, utils::ConfigurationBag>& plugins) {
+			std::unordered_set<std::string> otherSections{
+				"network", "chain", "fork_heights", "treasury_reissuance_transaction_signatures"
+			};
+
+			size_t numPluginProperties = 0;
+			for (const auto& section : bag.sections()) {
+				if (otherSections.cend() != otherSections.find(section))
+					continue;
+
+				std::string prefix("plugin:");
+				if (section.size() <= prefix.size() || 0 != section.find(prefix))
+					CATAPULT_THROW_INVALID_ARGUMENT_1("configuration bag contains unexpected section", section);
+
+				auto pluginName = section.substr(prefix.size());
+				CheckPluginName(pluginName);
+				auto iter = plugins.emplace(pluginName, utils::ExtractSectionAsBag(bag, section.c_str())).first;
+				numPluginProperties += iter->second.size();
+			}
+
+			return numPluginProperties;
 		}
 	}
 
@@ -89,28 +124,24 @@ namespace catapult { namespace model {
 
 		LOAD_CHAIN_PROPERTY(HarvestBeneficiaryPercentage);
 		LOAD_CHAIN_PROPERTY(HarvestNetworkPercentage);
+		LOAD_CHAIN_PROPERTY(HarvestNetworkFeeSinkAddressV1);
 		LOAD_CHAIN_PROPERTY(HarvestNetworkFeeSinkAddress);
 
 		LOAD_CHAIN_PROPERTY(MaxTransactionsPerBlock);
 
 #undef LOAD_CHAIN_PROPERTY
 
-		size_t numPluginProperties = 0;
-		for (const auto& section : bag.sections()) {
-			if ("network" == section || "chain" == section)
-				continue;
+#define LOAD_FORK_HEIGHT_PROPERTY(NAME) utils::LoadIniProperty(bag, "fork_heights", #NAME, config.ForkHeights.NAME)
 
-			std::string prefix("plugin:");
-			if (section.size() <= prefix.size() || 0 != section.find(prefix))
-				CATAPULT_THROW_INVALID_ARGUMENT_1("configuration bag contains unexpected section", section);
+		LOAD_FORK_HEIGHT_PROPERTY(TotalVotingBalanceCalculationFix);
+		LOAD_FORK_HEIGHT_PROPERTY(TreasuryReissuance);
 
-			auto pluginName = section.substr(prefix.size());
-			CheckPluginName(pluginName);
-			auto iter = config.Plugins.emplace(pluginName, utils::ExtractSectionAsBag(bag, section.c_str())).first;
-			numPluginProperties += iter->second.size();
-		}
+#undef LOAD_FORK_HEIGHT_PROPERTY
 
-		utils::VerifyBagSizeExact(bag, 5 + 27 + numPluginProperties);
+		auto numAdditionalSignatures = ParseSignaturesSection(bag, config.TreasuryReissuanceTransactionSignatures);
+		auto numPluginProperties = ParsePluginSections(bag, config.Plugins);
+
+		utils::VerifyBagSizeExact(bag, 5 + 28 + 2 + numAdditionalSignatures + numPluginProperties);
 		return config;
 	}
 
@@ -120,6 +151,12 @@ namespace catapult { namespace model {
 
 	UnresolvedMosaicId GetUnresolvedCurrencyMosaicId(const BlockChainConfiguration& config) {
 		return UnresolvedMosaicId(config.CurrencyMosaicId.unwrap());
+	}
+
+	HeightDependentAddress GetHarvestNetworkFeeSinkAddress(const BlockChainConfiguration& config) {
+		HeightDependentAddress sinkAddress(config.HarvestNetworkFeeSinkAddress);
+		sinkAddress.trySet(config.HarvestNetworkFeeSinkAddressV1, config.ForkHeights.TreasuryReissuance);
+		return sinkAddress;
 	}
 
 	namespace {

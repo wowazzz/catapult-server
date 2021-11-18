@@ -192,18 +192,22 @@ namespace catapult { namespace plugins {
 				.add(validators::CreateAddressValidator())
 				.add(validators::CreatePublicKeyValidator())
 				.add(validators::CreateDeadlineValidator(config.MaxTransactionLifetime))
-				.add(validators::CreateNemesisSinkValidator())
+				.add(validators::CreateNemesisSinkValidator(
+						config.ForkHeights.TreasuryReissuance,
+						config.TreasuryReissuanceTransactionSignatures))
 				.add(validators::CreateEligibleHarvesterValidator())
 				.add(validators::CreateBalanceDebitValidator())
 				.add(validators::CreateBalanceTransferValidator())
-				.add(validators::CreateImportanceBlockValidator());
+				.add(validators::CreateImportanceBlockValidator(
+						config.ForkHeights.TotalVotingBalanceCalculationFix,
+						config.VotingSetGrouping));
 		});
 
 		auto harvestFeeOptions = observers::HarvestFeeOptions{
 			config.CurrencyMosaicId,
 			config.HarvestBeneficiaryPercentage,
 			config.HarvestNetworkPercentage,
-			config.HarvestNetworkFeeSinkAddress
+			model::GetHarvestNetworkFeeSinkAddress(config)
 		};
 		const auto& calculator = manager.inflationConfig().InflationCalculator;
 		manager.addObserverHook([harvestFeeOptions, &calculator](auto& builder) {

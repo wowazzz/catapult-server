@@ -19,42 +19,12 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
-#include "src/config/PriceConfiguration.h"
-#include "tests/test/nodeps/ConfigurationTestUtils.h"
-#include "tests/TestHarness.h"
+#pragma once
+#include "mongo/src/MongoTransactionPlugin.h"
 
-namespace catapult { namespace config {
+namespace catapult { namespace mongo { namespace plugins {
 
-	namespace {
-		struct PriceConfigurationTraits {
-			using ConfigurationType = PriceConfiguration;
-
-			static utils::ConfigurationBag::ValuesContainer CreateProperties() {
-				return {
-					{
-						"",
-						{
-							{ "maxMessageSize", "859" }
-						}
-					}
-				};
-			}
-
-			static bool IsSectionOptional(const std::string&) {
-				return false;
-			}
-
-			static void AssertZero(const PriceConfiguration& config) {
-				// Assert:
-				EXPECT_EQ(0u, config.MaxMessageSize);
-			}
-
-			static void AssertCustom(const PriceConfiguration& config) {
-				// Assert:
-				EXPECT_EQ(859u, config.MaxMessageSize);
-			}
-		};
-	}
-
-	DEFINE_CONFIGURATION_TESTS(PriceConfigurationTests, Price)
-}}
+	/// Creates a mongo mosaic supply revocation transaction plugin.
+	PLUGIN_API
+	std::unique_ptr<MongoTransactionPlugin> CreateMosaicSupplyRevocationTransactionMongoPlugin();
+}}}

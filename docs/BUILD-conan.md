@@ -40,10 +40,21 @@ Following instructions should work on Mac, Linux (Ubuntu 20.04) and Windows.
   2. Install build dependencies:
 
      ```sh
-     brew install git cmake ninja
+     brew install git cmake ninja pkg-config
      ```
 
   3. Install [Conan](https://conan.io/downloads.html).
+
+  4. Set the right config for Conan:
+
+      ```sh
+      conan profile new default --detect
+      conan config set general.revisions_enabled=True
+      ```
+
+  5. Modify `conanfile.txt` (Only for Mac M1):
+      - Change `boost:without_math=True`.
+      - Add `rocksdb:enable_sse = False` under `rocksdb:shared = True`.
 
 ## Step 1: Build dependencies
 
@@ -51,13 +62,13 @@ While Conan will be building and installing packages, you might want to go for a
 as this will probably take *a bit*.
 
 ```sh
-conan remote add nemtech https://catapult.jfrog.io/artifactory/api/conan/ngl-conan
+conan remote add nemtech https://catapult.jfrog.io/artifactory/api/conan/symbol-conan
 
-git clone https://github.com/nemtech/catapult-server.git
-cd catapult-server
+git clone https://github.com/symbol/catapult-client.git
+cd catapult-client
 
 mkdir _build && cd _build
-conan install .. --build missing
+CONAN_REVISIONS_ENABLED=1 conan install .. --build missing
 ```
 
 ## Step 2: Build catapult
