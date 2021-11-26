@@ -19,29 +19,31 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
-#include "Observers.h"
-#include "catapult/config/CatapultDataDirectory.h"
-#include "catapult/io/FileQueue.h"
-#include "catapult/io/PodIoUtils.h"
-#include "priceUtil.h"
-#include "src/catapult/model/NetworkIdentifier.h"
-#include "src/catapult/model/Address.h"
+#include "PriceConfiguration.h"
+#include "catapult/model/Address.h"
+#include "catapult/utils/ConfigurationBag.h"
+#include "catapult/utils/ConfigurationUtils.h"
 
-namespace catapult { namespace observers {
+namespace catapult { namespace config {
 
-	namespace {
-		using Notification = model::PriceMessageNotification;
+	PriceConfiguration PriceConfiguration::Uninitialized() {
+		return PriceConfiguration();
 	}
 
-	DEFINE_OBSERVER(PriceMessage, Notification, [](
-		const Notification& notification,
-		const ObserverContext& context) {
+	PriceConfiguration PriceConfiguration::LoadFromBag(const utils::ConfigurationBag& bag) {
+		PriceConfiguration config;
 
-		std::string senderKeyString(reinterpret_cast<const char*>(notification.SenderPublicKey.data()), sizeof(notification.SenderPublicKey.data()));
+#define LOAD_PROPERTY(NAME) utils::LoadIniProperty(bag, "", #NAME, config.NAME)
 
-		if (senderKeyString == plugins::pricePublisherAddress) {
-			catapult::plugins::processPriceTransaction(notification.blockHeight, notification.lowPrice,
-				notification.highPrice, context.Mode == NotifyMode::Rollback);
-		}
-	})
+		LOAD_PROPERTY(initialSupply);
+		LOAD_PROPERTY(pricePublisherAddress);
+		LOAD_PROPERTY(feeRecalculationFrequency);
+		LOAD_PROPERTY(multiplierRecalculationFrequency);
+		LOAD_PROPERTY(pricePeriodBlocks);
+
+#undef LOAD_PROPERTY
+
+		utils::VerifyBagSizeExact(bag, 5);
+		return config;
+	}
 }}
