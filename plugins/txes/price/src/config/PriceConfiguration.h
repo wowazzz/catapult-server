@@ -19,29 +19,35 @@
 *** along with Catapult. If not, see <http://www.gnu.org/licenses/>.
 **/
 
-#include "Observers.h"
-#include "catapult/config/CatapultDataDirectory.h"
-#include "catapult/io/FileQueue.h"
-#include "catapult/io/PodIoUtils.h"
-#include "priceUtil.h"
-#include "src/catapult/model/NetworkIdentifier.h"
-#include "src/catapult/model/Address.h"
+#pragma once
+#include "catapult/utils/BlockSpan.h"
+#include <unordered_set>
 
-namespace catapult { namespace observers {
+namespace catapult { namespace utils { class ConfigurationBag; } }
 
-	namespace {
-		using Notification = model::PriceMessageNotification;
-	}
+namespace catapult { namespace config {
 
-	DEFINE_OBSERVER(PriceMessage, Notification, [](
-		const Notification& notification,
-		const ObserverContext& context) {
+	/// Price plugin configuration settings.
+	struct PriceConfiguration {
+	public:
+		uint64_t initialSupply;
 
-		std::string senderKeyString(reinterpret_cast<const char*>(notification.SenderPublicKey.data()), sizeof(notification.SenderPublicKey.data()));
+		std::string pricePublisherAddress;
 
-		if (senderKeyString == plugins::pricePublisherAddress) {
-			catapult::plugins::processPriceTransaction(notification.blockHeight, notification.lowPrice,
-				notification.highPrice, context.Mode == NotifyMode::Rollback);
-		}
-	})
+		uint64_t feeRecalculationFrequency;
+
+		uint64_t multiplierRecalculationFrequency;
+
+		uint64_t pricePeriodBlocks;
+
+	private:
+		PriceConfiguration() = default;
+
+	public:
+		/// Creates an uninitialized price configuration.
+		static PriceConfiguration Uninitialized();
+
+		/// Loads a price configuration from \a bag.
+		static PriceConfiguration LoadFromBag(const utils::ConfigurationBag& bag);
+	};
 }}
