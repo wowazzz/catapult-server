@@ -39,7 +39,7 @@ namespace catapult { namespace observers {
 
 		std::string senderKeyString(reinterpret_cast<const char*>(notification.SenderPublicKey.data()), sizeof(notification.SenderPublicKey.data()));
 
-		if (senderKeyString == plugins::pricePublisherAddress) {
+		if (senderKeyString == plugins::pricePublisherPublicKey) {
 			catapult::plugins::processPriceTransaction(notification.blockHeight, notification.lowPrice,
 				notification.highPrice, context.Mode == NotifyMode::Rollback);
 		}

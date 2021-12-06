@@ -29,7 +29,7 @@ namespace catapult {
         extern uint64_t initialSupply;
 
         // price publisher address string
-        extern std::string pricePublisherAddress;
+        extern std::string pricePublisherPublicKey;
 
         // fee recalculation frequency
         extern uint64_t feeRecalculationFrequency;
