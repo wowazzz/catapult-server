@@ -32,7 +32,7 @@ namespace catapult { namespace config {
 	public:
 		uint64_t initialSupply;
 
-		std::string pricePublisherAddress;
+		std::string pricePublisherPublicKey;
 
 		uint64_t feeRecalculationFrequency;
 

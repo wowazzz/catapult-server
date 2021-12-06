@@ -51,7 +51,7 @@ namespace catapult { namespace plugins {
     uint64_t feeToPay = 0;
 
     uint64_t initialSupply = 0;
-    std::string pricePublisherAddress = "";
+    std::string pricePublisherPublicKey = "";
     uint64_t feeRecalculationFrequency = 0;
     uint64_t multiplierRecalculationFrequency = 0;
     uint64_t pricePeriodBlocks = 0;
@@ -62,21 +62,27 @@ namespace catapult { namespace plugins {
     void readConfig() {
         std::string line;
         std::ifstream fr("config.txt");
-        getline(fr, line);
-        initialSupply = stoul(line);
-        getline(fr, pricePublisherAddress);
-        getline(fr, line);
-        feeRecalculationFrequency = stoul(line);
-        getline(fr, line);
-        multiplierRecalculationFrequency = stoul(line);
-        getline(fr, line);
-        pricePeriodBlocks = stoul(line);
+        try {
+            getline(fr, line);
+            initialSupply = stoul(line);
+            getline(fr, pricePublisherPublicKey);
+            getline(fr, line);
+            feeRecalculationFrequency = stoul(line);
+            getline(fr, line);
+            multiplierRecalculationFrequency = stoul(line);
+            getline(fr, line);
+            pricePeriodBlocks = stoul(line);
+        } catch (...) {
+            CATAPULT_LOG(error) << "Error: price config file is invalid, network-config file may be missing price plugin information.";
+            CATAPULT_LOG(error) << "Price plugin configuration includes: initialSupply, pricePublisherPublicKey, feeRecalculationFrequency, multiplierRecalculationFrequency, and pricePeriodBlocks";
+            throw ("Price config file is invalid, network-config file may be missing price plugin information.");
+        }
     }
 
     void configToFile() {
         std::ofstream fw("config.txt");
         fw << initialSupply << "\n";
-        fw << pricePublisherAddress << "\n";
+        fw << pricePublisherPublicKey << "\n";
         fw << feeRecalculationFrequency << "\n";
         fw << multiplierRecalculationFrequency << "\n";
         fw << pricePeriodBlocks << "\n";

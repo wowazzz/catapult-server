@@ -36,7 +36,7 @@ namespace catapult { namespace config {
 #define LOAD_PROPERTY(NAME) utils::LoadIniProperty(bag, "", #NAME, config.NAME)
 
 		LOAD_PROPERTY(initialSupply);
-		LOAD_PROPERTY(pricePublisherAddress);
+		LOAD_PROPERTY(pricePublisherPublicKey);
 		LOAD_PROPERTY(feeRecalculationFrequency);
 		LOAD_PROPERTY(multiplierRecalculationFrequency);
 		LOAD_PROPERTY(pricePeriodBlocks);

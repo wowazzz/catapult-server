@@ -37,7 +37,7 @@ namespace catapult { namespace plugins {
 	void RegisterPriceSubsystem(PluginManager& manager) {
 		auto config = catapult::model::LoadPluginConfiguration<config::PriceConfiguration>(manager.config(), "catapult.plugins.price");
 		catapult::plugins::initialSupply = config.initialSupply;
-		catapult::plugins::pricePublisherAddress = config.pricePublisherAddress;
+		catapult::plugins::pricePublisherPublicKey = config.pricePublisherPublicKey;
 		catapult::plugins::feeRecalculationFrequency = config.feeRecalculationFrequency;
 		catapult::plugins::multiplierRecalculationFrequency = config.multiplierRecalculationFrequency;
 		catapult::plugins::pricePeriodBlocks = config.pricePeriodBlocks;
