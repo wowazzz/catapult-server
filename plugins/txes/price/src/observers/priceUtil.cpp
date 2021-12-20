@@ -61,7 +61,7 @@ namespace catapult { namespace plugins {
 
     void readConfig() {
         std::string line;
-        std::ifstream fr("config.txt");
+        std::ifstream fr("./data/config.txt");
         try {
             getline(fr, line);
             initialSupply = stoul(line);
@@ -80,7 +80,7 @@ namespace catapult { namespace plugins {
     }
 
     void configToFile() {
-        std::ofstream fw("config.txt");
+        std::ofstream fw("./data/config.txt");
         fw << initialSupply << "\n";
         fw << pricePublisherPublicKey << "\n";
         fw << feeRecalculationFrequency << "\n";
@@ -117,7 +117,7 @@ namespace catapult { namespace plugins {
     }
 
     double getCoinGenerationMultiplier(uint64_t blockHeight, bool rollback) {
-        if (blockHeight % multiplierRecalculationFrequency  > 0 && !areSame(currentMultiplier, 0) != 0 && !rollback) // recalculate only every 720 blocks
+        if (blockHeight % multiplierRecalculationFrequency > 0 && !areSame(currentMultiplier, 0) != 0 && !rollback) // recalculate only every 720 blocks
             return currentMultiplier;
         else if (areSame(currentMultiplier, 0))
             currentMultiplier = 1;
@@ -189,7 +189,7 @@ namespace catapult { namespace plugins {
         return 1;
     }
 
-    uint64_t getFeeToPay(uint64_t blockHeight, bool rollback) {
+    uint64_t getFeeToPay(uint64_t blockHeight, bool rollback, std::string beneficiary) {
         uint64_t collectedEpochFees = 0;
         std::deque<std::tuple<uint64_t, uint64_t, uint64_t, std::string>>::reverse_iterator it;
         if (rollback) {
@@ -198,8 +198,9 @@ namespace catapult { namespace plugins {
                 return feeToPay;
             }
             for (it = catapult::plugins::epochFees.rbegin(); it != catapult::plugins::epochFees.rend(); ++it) {         
-                if (std::get<0>(*it) == blockHeight) {
+                if (std::get<0>(*it) == blockHeight && std::get<3>(*it) == beneficiary) {
                     feeToPay = std::get<2>(*it);
+                    break;
                 } else if (std::get<0>(*it) < blockHeight) {
                     feeToPay = 0;
                     break;
@@ -219,6 +220,14 @@ namespace catapult { namespace plugins {
                 }
             }
             feeToPay = static_cast<unsigned int>(static_cast<double>(collectedEpochFees) / static_cast<double>(feeRecalculationFrequency) + 0.5);
+        }
+        else if (feeToPay == 0 && blockHeight > feeRecalculationFrequency) {
+            for (it = catapult::plugins::epochFees.rbegin(); it != catapult::plugins::epochFees.rend(); ++it) {
+                if (blockHeight - 1 == std::get<0>(*it)) {
+                    feeToPay = std::get<2>(*it);
+                    break;
+                }
+            }
         }
         return feeToPay;
     }
@@ -397,24 +406,24 @@ namespace catapult { namespace plugins {
     void addPriceEntryToFile(uint64_t blockHeight, uint64_t lowPrice, uint64_t highPrice, double multiplier) {
         long size = 0;
         FILE *file;
-        errno_t err = fopen_s(&file, "prices.txt", "r+");
+        errno_t err = fopen_s(&file, "./data/prices.txt", "r+");
         if (err != 0) {
-            err = fopen_s(&file, "prices.txt", "w+");
+            err = fopen_s(&file, "./data/prices.txt", "w+");
             if (err != 0) {
-                CATAPULT_LOG(error) << "Error: Can't open nor create the prices.txt file\n";
+                CATAPULT_LOG(error) << "Error: Can't open nor create the ./data/prices.txt file\n";
                 return;
             }
         } else {
             fseek(file, 0, SEEK_END);
             size = ftell(file);
             if (size == -1) {
-                CATAPULT_LOG(error) << "Error: problem with fseek in prices.txt file\n";
+                CATAPULT_LOG(error) << "Error: problem with fseek in ./data/prices.txt file\n";
                 fclose(file);
                 return;
             }
         }
         if (size % 50 > 0) {
-            CATAPULT_LOG(error) << "Fatal error: prices.txt file is corrupt/invalid\n";
+            CATAPULT_LOG(error) << "Fatal error: ./data/prices.txt file is corrupt/invalid\n";
             return;
         }
         
@@ -447,7 +456,7 @@ namespace catapult { namespace plugins {
 
     void updatePricesFile() {
         FILE *file;
-        errno_t err = fopen_s(&file, "prices.txt", "w"); // erase and rewrite the prices
+        errno_t err = fopen_s(&file, "./data/prices.txt", "w"); // erase and rewrite the prices
         if (err == 0)
             fclose(file);
         std::deque<std::tuple<uint64_t, uint64_t, uint64_t, double>>::iterator it;
@@ -489,19 +498,19 @@ namespace catapult { namespace plugins {
         std::string blockHeight = "", lowPrice = "", highPrice = "", multiplierStr = "";
         priceList.clear();
         FILE *file;
-        errno_t err = fopen_s(&file, "prices.txt", "r+");
+        errno_t err = fopen_s(&file, "./data/prices.txt", "r+");
         if (err != 0) {
-            CATAPULT_LOG(warning) << "Warning: prices.txt does not exist\n";
+            CATAPULT_LOG(warning) << "Warning: ./data/prices.txt does not exist\n";
             return;
         }
         fseek(file, 0, SEEK_END);
         size = ftell(file);
         if (size == -1) {
-            CATAPULT_LOG(error) << "Error: problem with fseek in prices.txt file\n";
+            CATAPULT_LOG(error) << "Error: problem with fseek in ./data/prices.txt file\n";
             fclose(file);
             return;
         } else if (size % 100 > 0) {
-            CATAPULT_LOG(error) << "Error: prices.txt content is invalid\n";
+            CATAPULT_LOG(error) << "Error: ./data/prices.txt content is invalid\n";
             fclose(file);
             return;
         }
@@ -531,7 +540,7 @@ namespace catapult { namespace plugins {
                 errors = true;
             }
             if (errors) {
-                CATAPULT_LOG(error) << "Fatal error: prices.txt file is corrupt/invalid\n";
+                CATAPULT_LOG(error) << "Fatal error: ./data/prices.txt file is corrupt/invalid\n";
                 break;
             }
         }
@@ -628,24 +637,24 @@ namespace catapult { namespace plugins {
     void addTotalSupplyEntryToFile(uint64_t blockHeight, uint64_t supplyAmount, uint64_t increase) {
         long size = 0;
         FILE *file;
-        errno_t err = fopen_s(&file, "totalSupply.txt", "r+");
+        errno_t err = fopen_s(&file, "./data/totalSupply.txt", "r+");
         if (err != 0) {
-            err = fopen_s(&file, "totalSupply.txt", "w+");
+            err = fopen_s(&file, "./data/totalSupply.txt", "w+");
             if (err != 0) {
-                CATAPULT_LOG(error) << "Error: Can't open nor create the totalSupply.txt file\n";
+                CATAPULT_LOG(error) << "Error: Can't open nor create the ./data/totalSupply.txt file\n";
                 return;
             }
         } else {
             fseek(file, 0, SEEK_END);
             size = ftell(file);
             if (size == -1) {
-                CATAPULT_LOG(error) << "Error: problem with fseek in totalSupply.txt file\n";
+                CATAPULT_LOG(error) << "Error: problem with fseek in ./data/totalSupply.txt file\n";
                 fclose(file);
                 return;
             }
         }
         if (size % 34 > 0) {
-            CATAPULT_LOG(error) << "Fatal error: totalSupply.txt file is corrupt/invalid\n";
+            CATAPULT_LOG(error) << "Fatal error: ./data/totalSupply.txt file is corrupt/invalid\n";
             return;
         }
 
@@ -677,7 +686,7 @@ namespace catapult { namespace plugins {
 
     void updateTotalSupplyFile() {
         FILE *file;
-        errno_t err = fopen_s(&file, "totalSupply.txt", "w"); // erase and rewrite the prices
+        errno_t err = fopen_s(&file, "./data/totalSupply.txt", "w"); // erase and rewrite the prices
         if (err == 0)
             fclose(file);
         std::deque<std::tuple<uint64_t, uint64_t, uint64_t>>::iterator it;
@@ -714,19 +723,19 @@ namespace catapult { namespace plugins {
         std::string blockHeight = "", supply = "", increase = "";
         totalSupply.clear();
         FILE *file;
-        errno_t err = fopen_s(&file, "totalSupply.txt", "r+");
+        errno_t err = fopen_s(&file, "./data/totalSupply.txt", "r+");
         if (err != 0) {
-            CATAPULT_LOG(warning) << "Warning: totalSupply.txt does not exist\n";
+            CATAPULT_LOG(warning) << "Warning: ./data/totalSupply.txt does not exist\n";
             return;
         }
         fseek(file, 0, SEEK_END);
         size = ftell(file);
         if (size == -1) {
-            CATAPULT_LOG(error) << "Error: problem with fseek in totalSupply.txt file\n";
+            CATAPULT_LOG(error) << "Error: problem with fseek in ./data/totalSupply.txt file\n";
             fclose(file);
             return;
         } else if (size % 34 > 0) {
-            CATAPULT_LOG(error) << "Error: totalSupply.txt content is invalid\n";
+            CATAPULT_LOG(error) << "Error: ./data/totalSupply.txt content is invalid\n";
             fclose(file);
             return;
         }
@@ -745,7 +754,7 @@ namespace catapult { namespace plugins {
 
             errors = !addTotalSupplyEntry(std::stoul(blockHeight), std::stoul(supply), std::stoul(increase), false);
             if (errors) {
-                CATAPULT_LOG(error) << "Fatal error: totalSupply.txt file is corrupt/invalid\n";
+                CATAPULT_LOG(error) << "Fatal error: ./data/totalSupply.txt file is corrupt/invalid\n";
                 break;
             }
         }
@@ -795,15 +804,13 @@ namespace catapult { namespace plugins {
             if (previousEntryHeight > blockHeight) {
                 CATAPULT_LOG(warning) << "Warning: epoch fee entry block height is lower to the previous: " <<
                     "Previous height: " << previousEntryHeight << ", current height: " << blockHeight << "\n";
-                return false;
-            } else if (previousEntryHeight == blockHeight) {
-                for (unsigned int i = 0; i < prevAddresses.size(); ++i) {
-                    if (prevAddresses[i] == address) {
-                        CATAPULT_LOG(warning) << "Warning: skipping a duplicate epoch fee entry for block: " << blockHeight <<
-                            ", collected fees: " << collectedFees << ", currentFee: " << currentFee << ", address: " << address << "\n";
-                        return false;
+                
+                for (it = catapult::plugins::epochFees.rbegin(); it != catapult::plugins::epochFees.rend(); ++it) {
+                    if (std::get<0>(*it) <= blockHeight) {
+                        catapult::plugins::epochFees.insert(it.base(), {blockHeight, collectedFees, currentFee, address});
                     }
                 }
+                return true;
             }
         }
         epochFees.push_back({blockHeight, collectedFees, currentFee, address});
@@ -827,7 +834,6 @@ namespace catapult { namespace plugins {
                 it = decltype(it)(epochFees.erase(std::next(it).base()));
                 CATAPULT_LOG(info) << "Epoch fee entry removed from the list for block " << blockHeight 
                     << ", collectedFees: " << collectedFees << ", feeToPay: " << blockFee << ", address: " << address << "\n";
-                break;
             }
         }
         updateEpochFeeFile(); // update data in the file
@@ -836,24 +842,24 @@ namespace catapult { namespace plugins {
     void addEpochFeeEntryToFile(uint64_t blockHeight, uint64_t collectedFees, uint64_t blockFee, std::string address) {
         long size = 0;
         FILE *file;
-        errno_t err = fopen_s(&file, "epochFees.txt", "r+");
+        errno_t err = fopen_s(&file, "./data/epochFees.txt", "r+");
         if (err != 0) {
-            err = fopen_s(&file, "epochFees.txt", "w+");
+            err = fopen_s(&file, "./data/epochFees.txt", "w+");
             if (err != 0) {
-                CATAPULT_LOG(error) << "Error: Can't open nor create the epochFees.txt file\n";
+                CATAPULT_LOG(error) << "Error: Can't open nor create the ./data/epochFees.txt file\n";
                 return;
             }
         } else {
             fseek(file, 0, SEEK_END);
             size = ftell(file);
             if (size == -1) {
-                CATAPULT_LOG(error) << "Error: problem with fseek in epochFees.txt file\n";
+                CATAPULT_LOG(error) << "Error: problem with fseek in ./data/epochFees.txt file\n";
                 fclose(file);
                 return;
             }
         }
         if (size % 84 > 0) {
-            CATAPULT_LOG(error) << "Fatal error: epochFees.txt file is corrupt/invalid\n";
+            CATAPULT_LOG(error) << "Fatal error: ./data/epochFees.txt file is corrupt/invalid\n";
             return;
         }
 
@@ -890,7 +896,7 @@ namespace catapult { namespace plugins {
 
     void updateEpochFeeFile() {
         FILE *file;
-        errno_t err = fopen_s(&file, "epochFees.txt", "w"); // erase and rewrite the data
+        errno_t err = fopen_s(&file, "./data/epochFees.txt", "w"); // erase and rewrite the data
         if (err == 0)
             fclose(file);
         std::deque<std::tuple<uint64_t, uint64_t, uint64_t, std::string>>::iterator it;
@@ -932,19 +938,19 @@ namespace catapult { namespace plugins {
         std::string blockHeight = "", collectedFees = "", currentFee = "", address = "";
         epochFees.clear();
         FILE *file;
-        errno_t err = fopen_s(&file, "epochFees.txt", "r+");
+        errno_t err = fopen_s(&file, "./data/epochFees.txt", "r+");
         if (err != 0) {
-            CATAPULT_LOG(warning) << "Warning: epochFees.txt does not exist\n";
+            CATAPULT_LOG(warning) << "Warning: ./data/epochFees.txt does not exist\n";
             return;
         }
         fseek(file, 0, SEEK_END);
         size = ftell(file);
         if (size == -1) {
-            CATAPULT_LOG(error) << "Error: problem with fseek in epochFees.txt file\n";
+            CATAPULT_LOG(error) << "Error: problem with fseek in ./data/epochFees.txt file\n";
             fclose(file);
             return;
         } else if (size % 84 > 0) {
-            CATAPULT_LOG(error) << "Error: epochFees.txt content is invalid\n";
+            CATAPULT_LOG(error) << "Error: ./data/epochFees.txt content is invalid\n";
             fclose(file);
             return;
         }
@@ -969,7 +975,7 @@ namespace catapult { namespace plugins {
 
             errors = !addEpochFeeEntry(std::stoul(blockHeight), std::stoul(collectedFees), std::stoul(currentFee), address, false);
             if (errors) {
-                CATAPULT_LOG(error) << "Fatal error: epochFees.txt file is corrupt/invalid\n";
+                CATAPULT_LOG(error) << "Fatal error: ./data/epochFees.txt file is corrupt/invalid\n";
                 break;
             }
         }

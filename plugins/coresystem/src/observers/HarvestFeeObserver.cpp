@@ -88,7 +88,7 @@ namespace catapult { namespace observers {
 				catapult::plugins::loadPricesFromFile();
 				catapult::plugins::loadTotalSupplyFromFile();
 				catapult::plugins::readConfig();
-				catapult::plugins::totalSupply.push_front({0, catapult::plugins::initialSupply, 
+				catapult::plugins::totalSupply.push_front({1, catapult::plugins::initialSupply, 
 					catapult::plugins::initialSupply});
 			}
 
@@ -115,13 +115,17 @@ namespace catapult { namespace observers {
 				} else {
 					CATAPULT_LOG(warning) << "Warning: epoch fees list is empty\n";
 				}
-				collectedEpochFees += notification.TotalFee.unwrap();
-				catapult::plugins::addEpochFeeEntry(context.Height.unwrap(), collectedEpochFees, feeToPay, model::AddressToString(notification.Harvester));
+				if (context.Height.unwrap() % catapult::plugins::feeRecalculationFrequency == 0) {
+					collectedEpochFees = 0u;
+				}
+				collectedEpochFees += notification.TotalFee.unwrap() + context.Height.unwrap();
+				catapult::plugins::addEpochFeeEntry(context.Height.unwrap(), collectedEpochFees, feeToPay, model::AddressToString(notification.Beneficiary));
 				if (catapult::plugins::totalSupply.size() > 0) {
 					for (itTotal = catapult::plugins::totalSupply.rbegin(); itTotal != catapult::plugins::totalSupply.rend(); ++itTotal) {
-						if (context.Height.unwrap() >= std::get<0>(*itTotal))
+						if (context.Height.unwrap() >= std::get<0>(*itTotal)) {
 							totalSupply = std::get<1>(*itTotal);
 							break;
+						}
 					}
 				} else {
 					CATAPULT_LOG(warning) << "Warning: total supply list is empty\n";
@@ -140,24 +144,25 @@ namespace catapult { namespace observers {
 
 			} else if (NotifyMode::Rollback == context.Mode) {
 				multiplier = catapult::plugins::getCoinGenerationMultiplier(context.Height.unwrap(), true);
-				feeToPay = catapult::plugins::getFeeToPay(context.Height.unwrap(), true);
+				feeToPay = catapult::plugins::getFeeToPay(context.Height.unwrap(), true, model::AddressToString(notification.Beneficiary));
 				if (catapult::plugins::epochFees.size() > 0) {
 					for (itFees = catapult::plugins::epochFees.rbegin(); itFees != catapult::plugins::epochFees.rend(); ++itFees) {         
 						if (std::get<0>(*itFees) == context.Height.unwrap() && std::get<2>(*itFees) == feeToPay
-								&& std::get<3>(*itFees) == model::AddressToString(notification.Harvester)) {
+								&& std::get<3>(*itFees) == model::AddressToString(notification.Beneficiary)) {
 							collectedEpochFees = std::get<1>(*itFees);
 							break;
 						}
 						if (context.Height.unwrap() > std::get<0>(*itFees)) {
-							CATAPULT_LOG(error) << "Error: epoch fee entry for block " << context.Height.unwrap() <<
-								" can't be found\n";
+							CATAPULT_LOG(error) << "Error: epoch fee entry for block " << context.Height.unwrap()
+								<< " with beneficiary: " << model::AddressToString(notification.Beneficiary)
+								<< ", with feeToPay: " << feeToPay << " can't be found\n";
 							break;
 						}
 					}
 				} else {
 					CATAPULT_LOG(error) << "Error: epoch fees list is empty, rollback mode\n";
 				}
-				catapult::plugins::removeEpochFeeEntry(context.Height.unwrap(), collectedEpochFees, feeToPay, model::AddressToString(notification.Harvester));
+				catapult::plugins::removeEpochFeeEntry(context.Height.unwrap(), collectedEpochFees, feeToPay, model::AddressToString(notification.Beneficiary));
 				if (catapult::plugins::totalSupply.size() > 0) {
 					for (itTotal = catapult::plugins::totalSupply.rbegin(); itTotal != catapult::plugins::totalSupply.rend(); ++itTotal) {         
 						if (std::get<0>(*itTotal) == context.Height.unwrap()) {
